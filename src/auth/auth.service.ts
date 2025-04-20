@@ -7,6 +7,7 @@ import {
 import { UserService } from 'src/user/user.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -16,20 +17,21 @@ export class AuthService {
   ) {}
 
   // ✅ Register a new user
-  async register(email: string, password: string, name: string) {
+  async register(email: string, password: string, name: string, role: Role) {
     const existingUser = await this.userService.findByEmail(email);
     if (existingUser) {
       throw new ConflictException('Email already registered');
     }
-    const hashedPassword = await bcrypt.hash(password, 10);
 
+    const hashedPassword = await bcrypt.hash(password, 10);
     const user = await this.userService.createUser({
       email,
       password: hashedPassword,
       name,
+      role,
     });
 
-    const payload = { sub: user.id, email: user.email };
+    const payload = { sub: user.id, email: user.email, role: user.role };
     const token = this.jwtService.sign(payload);
 
     return { access_token: token };
@@ -47,7 +49,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const payload = { sub: user.id, email: user.email };
+    const payload = { sub: user.id, email: user.email, role: user.role };
     const token = this.jwtService.sign(payload);
 
     return { access_token: token };
