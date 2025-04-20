@@ -5,6 +5,7 @@ import { UserModule } from 'src/user/user.module';
 import { JwtModule } from '@nestjs/jwt';
 import { jwtConstants } from './constants';
 import { JwtStrategy } from './jwt.strategy';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Module({
   imports: [
