@@ -14,13 +14,43 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(STUDENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password       String
+  name           String
+  profilePicture Bytes?   
+  bio            String?  
+  mfaEnabled     Boolean  @default(false)
+  role           Role     @default(STUDENT)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Course relationships
+  teachingCourses Course[] @relation("CourseInstructor")
+  enrolledCourses Course[] @relation("CourseEnrollments")
+}
+
+model Course {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  code        String    @unique
+  status      CourseStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relationships
+  instructor  User      @relation("CourseInstructor", fields: [instructorId], references: [id])
+  instructorId String
+  students    User[]    @relation("CourseEnrollments")
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
 enum Role {

@@ -6,10 +6,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { jwtConstants } from './constants';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { PrismaModule } from 'src/prisma/prisma.module';
 
 @Module({
   imports: [
     UserModule,
+    PrismaModule,
     JwtModule.register({
       secret: jwtConstants.secret,
       signOptions: { expiresIn: '1d' },
