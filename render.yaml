@@ -3,7 +3,7 @@ services:
     name: tao-backend
     env: node
     plan: starter
-    buildCommand: yarn install && yarn prisma generate && yarn build
+    buildCommand: chmod +x build.sh && ./build.sh
     startCommand: node dist/main
     envVars:
       - key: NODE_ENV
