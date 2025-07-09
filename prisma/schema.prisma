@@ -21,6 +21,63 @@ model User {
   role      Role     @default(STUDENT)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  // Add relationship to courses (if users can create courses)
+  courses   Course[] @relation("UserCourses")
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  instructorId String?
+  instructor  User?     @relation("UserCourses", fields: [instructorId], references: [id])
+  instructorName String?
+  // Video fields for course demo video
+  demoVideoId String?
+  demoVideoUrl String?
+  demoVideoThumbnail String?
+  demoVideoDuration Int?
+  lessons     Lesson[]
+  materials   Material[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Lesson {
+  id          String   @id @default(uuid())
+  title       String
+  content     String?
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  // Video fields for lesson video
+  videoId     String?
+  videoUrl    String?
+  videoThumbnail String?
+  videoDuration Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Material {
+  id          String   @id @default(uuid())
+  title       String
+  fileUrl     String?
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Custom role management for extended functionality
+model RoleManagement {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions String[] // JSON array of permissions
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum Role {
