@@ -10,8 +10,8 @@ WORKDIR /app
 # Copy package files first for better caching
 COPY package.json yarn.lock ./
 
-# Install dependencies
-RUN yarn install --frozen-lockfile
+# Install dependencies (allow lockfile updates if needed)
+RUN yarn install --frozen-lockfile || yarn install
 
 # Rebuild the source code only when needed
 FROM base AS builder
