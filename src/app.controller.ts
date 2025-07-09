@@ -9,4 +9,21 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
+
+  @Get('health')
+  getHealth(): { status: string; timestamp: string } {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  @Get('api')
+  getApiInfo(): { message: string; version: string; docs: string } {
+    return {
+      message: 'Tao Backend API is running',
+      version: '1.0.0',
+      docs: '/api',
+    };
+  }
 }

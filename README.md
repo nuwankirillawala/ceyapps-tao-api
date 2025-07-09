@@ -26,7 +26,49 @@ A comprehensive Learning Management System (LMS) API built with **NestJS**, **Pr
 
 ---
 
-## ⚙️ Setup
+## 🚀 Deployment on Render
+
+### **Prerequisites**
+- Supabase database (already configured)
+- Cloudflare account for video streaming
+- GitHub repository
+
+### **Render Setup**
+
+1. **Connect Repository**
+   - Go to [Render Dashboard](https://dashboard.render.com)
+   - Click "New +" → "Web Service"
+   - Connect your GitHub repository
+
+2. **Configure Service**
+   - **Name**: `tao-backend`
+   - **Environment**: `Node`
+   - **Build Command**: `yarn install && yarn prisma generate && yarn build`
+   - **Start Command**: `node dist/main`
+
+3. **Environment Variables**
+   ```
+   NODE_ENV=production
+   PORT=3000
+   DATABASE_URL=your_supabase_connection_string
+   JWT_SECRET=your_jwt_secret_key
+   CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
+   CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
+   ALLOWED_ORIGINS=your_frontend_url,https://your-app.onrender.com
+   ```
+
+4. **Deploy**
+   - Click "Create Web Service"
+   - Render will automatically build and deploy your app
+   - Your API will be available at: `https://your-app.onrender.com`
+
+### **Post-Deployment**
+- **API Documentation**: `https://your-app.onrender.com/api`
+- **Health Check**: `https://your-app.onrender.com/api`
+
+---
+
+## ⚙️ Local Setup
 
 1. **Clone & Install**
    ```bash

@@ -8,6 +8,14 @@ dotenv.config();
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // CORS configuration for Render deployment
+  app.enableCors({
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  });
+
   // Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('Tao Backend API')
@@ -18,11 +26,15 @@ async function bootstrap() {
     .addTag('users', 'User management endpoints')
     .addTag('courses', 'Course management endpoints')
     .addTag('lessons', 'Lesson management endpoints')
+    .addTag('cloudflare', 'Cloudflare video streaming endpoints')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`🚀 Application is running on: http://localhost:${port}`);
+  console.log(`📚 Swagger documentation available at: http://localhost:${port}/api`);
 }
 bootstrap();
