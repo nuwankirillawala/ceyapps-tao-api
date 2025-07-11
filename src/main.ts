@@ -27,6 +27,7 @@ async function bootstrap() {
     .addTag('courses', 'Course management endpoints')
     .addTag('lessons', 'Lesson management endpoints')
     .addTag('cloudflare', 'Cloudflare video streaming endpoints')
+    .addTag('seed', 'Database seeding endpoints')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
