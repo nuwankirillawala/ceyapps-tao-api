@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudflareService } from '../cloudflare/cloudflare.service';
 import type { Prisma } from '@prisma/client';
+import { Level, Category } from '@prisma/client';
+import { CreateCourseDto } from './dto/create-course.dto';
 
 @Injectable()
 export class CoursesService {
@@ -10,13 +12,7 @@ export class CoursesService {
     private cloudflareService: CloudflareService,
   ) {}
 
-  async createCourse(data: {
-    title: string;
-    description?: string;
-    instructorId?: string;
-    instructorName?: string;
-    demoVideoId?: string;
-  }) {
+  async createCourse(data: CreateCourseDto) {
     // Validate instructorId if provided
     if (data.instructorId) {
       const instructor = await this.prisma.user.findUnique({
@@ -25,6 +21,11 @@ export class CoursesService {
 
       if (!instructor) {
         throw new NotFoundException(`User with ID ${data.instructorId} not found`);
+      }
+
+      // Ensure instructor has appropriate role
+      if (instructor.role !== 'ADMIN' && instructor.role !== 'INSTRUCTOR') {
+        throw new BadRequestException(`User with ID ${data.instructorId} does not have instructor privileges`);
       }
     }
 
@@ -49,28 +50,69 @@ export class CoursesService {
       }
     }
 
-    return this.prisma.course.create({
-      data: {
-        title: data.title,
-        description: data.description,
-        instructorId: data.instructorId,
-        instructorName: data.instructorName,
-        demoVideoId: data.demoVideoId,
-        demoVideoUrl,
-        demoVideoThumbnail,
-        demoVideoDuration,
-      },
-      include: {
-        lessons: true,
-        materials: true,
-        instructor: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    // Use transaction to create course and pricing together
+    return this.prisma.$transaction(async (prisma) => {
+      // Create the course
+      const course = await prisma.course.create({
+        data: {
+          title: data.title,
+          description: data.description,
+          instructorId: data.instructorId,
+          instructorName: data.instructorName,
+          demoVideoId: data.demoVideoId,
+          demoVideoUrl,
+          demoVideoThumbnail,
+          demoVideoDuration,
+          courseDuration: data.courseDuration,
+          level: data.level,
+          category: data.category,
+        },
+      });
+
+      // Create pricing if provided
+      if (data.pricing && data.pricing.length > 0) {
+        const pricingPromises = data.pricing.map(async (pricingData) => {
+          // Create new pricing entry
+          const pricing = await prisma.pricing.create({
+            data: {
+              price: pricingData.price,
+              country: pricingData.country,
+            },
+          });
+
+          // Create course pricing relationship
+          return prisma.coursePricing.create({
+            data: {
+              courseId: course.id,
+              pricingId: pricing.id,
+            },
+          });
+        });
+
+        await Promise.all(pricingPromises);
+      }
+
+      // Return course with all related data
+      return prisma.course.findUnique({
+        where: { id: course.id },
+        include: {
+          lessons: true,
+          materials: true,
+          instructor: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
+          coursePricings: {
+            include: {
+              pricing: true,
+            },
           },
         },
-      },
+      });
     });
   }
 
@@ -79,6 +121,19 @@ export class CoursesService {
       include: {
         lessons: true,
         materials: true,
+        instructor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        coursePricings: {
+          include: {
+            pricing: true,
+          },
+        },
       },
     });
   }
@@ -89,6 +144,19 @@ export class CoursesService {
       include: {
         lessons: true,
         materials: true,
+        instructor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        coursePricings: {
+          include: {
+            pricing: true,
+          },
+        },
       },
     });
 
@@ -194,14 +262,68 @@ export class CoursesService {
     });
   }
 
-  async updateCourse(id: string, data: Prisma.CourseUpdateInput) {
-    return this.prisma.course.update({
-      where: { id },
-      data,
-      include: {
-        lessons: true,
-        materials: true,
-      },
+  async updateCourse(id: string, data: Prisma.CourseUpdateInput & { pricing?: { price: number; country: string }[] }) {
+    const { pricing, ...courseData } = data;
+
+    return this.prisma.$transaction(async (prisma) => {
+      // Update course data
+      const course = await prisma.course.update({
+        where: { id },
+        data: courseData,
+      });
+
+      // Handle pricing update if provided
+      if (pricing) {
+        // Remove existing pricing relationships
+        await prisma.coursePricing.deleteMany({
+          where: { courseId: id },
+        });
+
+        // Add new pricing if provided
+        if (pricing.length > 0) {
+          const pricingPromises = pricing.map(async (pricingData) => {
+            // Create new pricing entry
+            const newPricing = await prisma.pricing.create({
+              data: {
+                price: pricingData.price,
+                country: pricingData.country,
+              },
+            });
+
+            // Create course pricing relationship
+            return prisma.coursePricing.create({
+              data: {
+                courseId: id,
+                pricingId: newPricing.id,
+              },
+            });
+          });
+
+          await Promise.all(pricingPromises);
+        }
+      }
+
+      // Return updated course with all related data
+      return prisma.course.findUnique({
+        where: { id },
+        include: {
+          lessons: true,
+          materials: true,
+          instructor: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
+          coursePricings: {
+            include: {
+              pricing: true,
+            },
+          },
+        },
+      });
     });
   }
 
@@ -283,5 +405,87 @@ export class CoursesService {
     }
 
     return material;
+  }
+
+  // Course pricing management methods
+  async addCoursePricing(courseId: string, pricingData: { price: number; country: string }) {
+    // Check if course exists
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+    });
+
+    if (!course) {
+      throw new NotFoundException(`Course with ID ${courseId} not found`);
+    }
+
+    return this.prisma.$transaction(async (prisma) => {
+      // Create pricing
+      const pricing = await prisma.pricing.create({
+        data: {
+          price: pricingData.price,
+          country: pricingData.country,
+        },
+      });
+
+      // Create course pricing relationship
+      return prisma.coursePricing.create({
+        data: {
+          courseId,
+          pricingId: pricing.id,
+        },
+        include: {
+          pricing: true,
+        },
+      });
+    });
+  }
+
+  async removeCoursePricing(courseId: string, pricingId: string) {
+    const coursePricing = await this.prisma.coursePricing.findFirst({
+      where: {
+        courseId,
+        pricingId,
+      },
+    });
+
+    if (!coursePricing) {
+      throw new NotFoundException(`Course pricing relationship not found`);
+    }
+
+    await this.prisma.$transaction(async (prisma) => {
+      // Delete the course pricing relationship
+      await prisma.coursePricing.delete({
+        where: { id: coursePricing.id },
+      });
+
+      // Check if pricing is used by other courses
+      const otherCoursePricings = await prisma.coursePricing.findMany({
+        where: { pricingId },
+      });
+
+      // If no other courses use this pricing, delete it
+      if (otherCoursePricings.length === 0) {
+        await prisma.pricing.delete({
+          where: { id: pricingId },
+        });
+      }
+    });
+  }
+
+  async getCoursePricing(courseId: string) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+    });
+
+    if (!course) {
+      throw new NotFoundException(`Course with ID ${courseId} not found`);
+    }
+
+    return this.prisma.coursePricing.findMany({
+      where: { courseId },
+      include: {
+        pricing: true,
+      },
+    });
   }
 } 

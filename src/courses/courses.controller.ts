@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
-import { CreateCourseDto } from './dto/create-course.dto';
+import { CreateCourseDto, CreatePricingDto } from './dto/create-course.dto';
 import { CreateLessonDto } from './dto/create-lesson.dto';
 import { CreateMaterialDto } from './dto/create-material.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
@@ -198,5 +198,90 @@ export class CoursesController {
   @Roles(Role.ADMIN, Role.INSTRUCTOR)
   async deleteMaterial(@Param('materialId') materialId: string) {
     return this.coursesService.deleteMaterial(materialId);
+  }
+
+  // Course pricing management endpoints
+  @Get(':id/pricing')
+  @ApiOperation({ summary: 'Get course pricing' })
+  @ApiParam({ name: 'id', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Course pricing retrieved successfully',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: 'pricing-uuid-123' },
+          pricing: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', example: 'pricing-uuid-123' },
+              price: { type: 'number', example: 99.99 },
+              country: { type: 'string', example: 'US' },
+            },
+          },
+        },
+      },
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Course not found' })
+  async getCoursePricing(@Param('id') courseId: string) {
+    return this.coursesService.getCoursePricing(courseId);
+  }
+
+  @Post(':id/pricing')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add pricing to course' })
+  @ApiParam({ name: 'id', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Course pricing added successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', example: 'course-pricing-uuid-123' },
+        courseId: { type: 'string', example: 'course-uuid-123' },
+        pricingId: { type: 'string', example: 'pricing-uuid-123' },
+        pricing: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'pricing-uuid-123' },
+            price: { type: 'number', example: 99.99 },
+            country: { type: 'string', example: 'US' },
+          },
+        },
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Course not found' })
+  async addCoursePricing(
+    @Param('id') courseId: string,
+    @Body() pricingData: CreatePricingDto,
+  ) {
+    return this.coursesService.addCoursePricing(courseId, pricingData);
+  }
+
+  @Delete(':courseId/pricing/:pricingId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove pricing from course' })
+  @ApiParam({ name: 'courseId', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiParam({ name: 'pricingId', description: 'Pricing ID', example: 'pricing-uuid-123' })
+  @ApiResponse({ status: 200, description: 'Course pricing removed successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Course or pricing not found' })
+  async removeCoursePricing(
+    @Param('courseId') courseId: string,
+    @Param('pricingId') pricingId: string,
+  ) {
+    return this.coursesService.removeCoursePricing(courseId, pricingId);
   }
 } 

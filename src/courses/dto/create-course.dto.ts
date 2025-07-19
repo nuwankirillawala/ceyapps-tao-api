@@ -1,17 +1,35 @@
-import { IsString, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsNumber, IsArray, ValidateNested, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { Level, Category } from '@prisma/client';
+
+export class CreatePricingDto {
+  @ApiProperty({
+    description: 'Price amount',
+    example: 99.99,
+  })
+  @IsNumber()
+  price: number;
+
+  @ApiProperty({
+    description: 'Country code for pricing',
+    example: 'US',
+  })
+  @IsString()
+  country: string;
+}
 
 export class CreateCourseDto {
   @ApiProperty({
     description: 'Course title',
-    example: 'Web Development Fundamentals',
+    example: 'Advanced Bartending Techniques',
   })
   @IsString()
   title: string;
 
   @ApiProperty({
     description: 'Course description',
-    example: 'Learn the basics of web development including HTML, CSS, and JavaScript',
+    example: 'Master advanced bartending techniques and cocktail preparation',
     required: false,
   })
   @IsString()
@@ -44,4 +62,41 @@ export class CreateCourseDto {
   @IsString()
   @IsOptional()
   demoVideoId?: string;
+
+  @ApiProperty({
+    description: 'Course duration in hours',
+    example: '10 hours',
+    required: true,
+  })
+  @IsString()
+  courseDuration: string;
+
+  @ApiProperty({
+    description: 'Course level',
+    enum: Level,
+    example: Level.BEGINNER,
+    required: true,
+  })
+  @IsEnum(Level)
+  level: Level;
+
+  @ApiProperty({
+    description: 'Course Category',
+    enum: Category,
+    example: Category.BARTENDING,
+    required: true,
+  })
+  @IsEnum(Category)
+  category: Category;
+
+  @ApiProperty({
+    description: 'Course pricing options',
+    type: [CreatePricingDto],
+    required: false,
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreatePricingDto)
+  @IsOptional()
+  pricing?: CreatePricingDto[];
 } 

@@ -38,10 +38,33 @@ model Course {
   demoVideoUrl String?
   demoVideoThumbnail String?
   demoVideoDuration Int?
+  courseDuration String
+  level Level @default(BEGINNER)
+  category Category @default(BARTENDING)
   lessons     Lesson[]
   materials   Material[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  coursePricings CoursePricing[]
+}
+
+model Pricing {
+  id String @id @default(uuid())
+  price Float
+  country String
+
+  coursePricings CoursePricing[]
+}
+
+model CoursePricing {
+  id         String   @id @default(uuid())
+  course     Course   @relation(fields: [courseId], references: [id])
+  courseId   String
+  pricing    Pricing  @relation(fields: [pricingId], references: [id])
+  pricingId  String
+
+  @@unique([courseId, pricingId]) // Optional: prevents duplicate entries
 }
 
 model Lesson {
@@ -84,4 +107,18 @@ enum Role {
   ADMIN
   INSTRUCTOR
   STUDENT
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum Category {
+  BARTENDING
+  MIXOLOGY
+  COCKTAILS
+  WINE
+  BEER
 }
