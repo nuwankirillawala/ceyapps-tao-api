@@ -1,6 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as FormData from 'form-data';
 
 export interface CloudflareVideoUploadResponse {
   uid: string;
@@ -57,7 +56,7 @@ export class CloudflareService {
     this.r2BucketName = this.configService.get<string>('CLOUDFLARE_R2_BUCKET_NAME');
     this.streamUrl = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/stream`;
     this.r2Url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/storage/buckets/${this.r2BucketName}/objects`;
-    this.imagesUrl = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/images/v2`;
+    this.imagesUrl = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/images/v2/direct_upload`;
   }
 
   /**
@@ -65,11 +64,6 @@ export class CloudflareService {
    */
   async testConnection(): Promise<any> {
     try {
-      console.log('Testing Cloudflare API connection...');
-      console.log('Account ID:', this.accountId);
-      console.log('API Token (first 10 chars):', this.apiToken ? this.apiToken.substring(0, 10) + '...' : 'NOT SET');
-      console.log('Images URL:', this.imagesUrl);
-
       // Test 1: Check account access
       const accountResponse = await fetch(`https://api.cloudflare.com/client/v4/accounts/${this.accountId}`, {
         method: 'GET',
@@ -86,7 +80,6 @@ export class CloudflareService {
       }
 
       const accountResult = await accountResponse.json();
-      console.log('Account access successful:', accountResult.result.name);
 
       // Test 2: Check Images API access
       const imagesResponse = await fetch(`${this.imagesUrl}`, {
@@ -104,7 +97,6 @@ export class CloudflareService {
       }
 
       const imagesResult = await imagesResponse.json();
-      console.log('Images API access successful');
 
       return {
         account: accountResult.result,
@@ -137,7 +129,7 @@ export class CloudflareService {
       headers: {
         'Authorization': `Bearer ${this.apiToken}`,
       },
-      body: formData as any,  
+      body: formData,
     });
 
     if (!response.ok) {
@@ -237,113 +229,80 @@ export class CloudflareService {
       throw new BadRequestException('No image file provided');
     }
 
-    // Validate environment variables
-    if (!this.accountId) {
-      throw new BadRequestException('CLOUDFLARE_ACCOUNT_ID is not configured');
-    }
-    if (!this.apiToken) {
-      throw new BadRequestException('CLOUDFLARE_API_TOKEN is not configured');
+    if (!this.accountId || !this.apiToken) {
+      throw new BadRequestException('Cloudflare configuration is missing');
     }
 
-    // Validate file type
     const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
     if (!allowedImageTypes.includes(file.mimetype)) {
       throw new BadRequestException('Invalid image file type. Allowed types: JPEG, PNG, GIF, WebP, SVG');
     }
 
-    // Validate file size (max 10MB for images)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
       throw new BadRequestException('Image file size too large. Maximum size: 10MB');
     }
 
     try {
-      console.log('Starting image upload...');
-      console.log('File:', file.originalname, 'Size:', file.size, 'Type:', file.mimetype);
-      
       // Step 1: Get direct upload URL
-      const directUploadFormData = new FormData();
-      directUploadFormData.append('requireSignedURLs', 'true');
-      
-      if (metadata) {
-        directUploadFormData.append('metadata', JSON.stringify(metadata));
-      }
+    const formData = new FormData();
 
-      console.log('Requesting direct upload URL from:', `${this.imagesUrl}/direct_upload`);
-      console.log('Headers:', {
-        'Authorization': `Bearer ${this.apiToken.substring(0, 10)}...`,
-        ...directUploadFormData.getHeaders(),
-      });
+    if (metadata) {
+      formData.append('metadata', JSON.stringify(metadata));
+    }
+    formData.append('requireSignedURLs', 'false');
 
-      const directUploadResponse = await fetch(`${this.imagesUrl}/direct_upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
-          ...directUploadFormData.getHeaders(),
-        },
-        body: directUploadFormData as any,
-      });
-
-      console.log('Direct upload response status:', directUploadResponse.status);
-      console.log('Direct upload response headers:', Object.fromEntries(directUploadResponse.headers.entries()));
+    const directUploadResponse = await fetch(`${this.imagesUrl}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiToken}`,
+      },
+      body: formData,
+    });
 
       if (!directUploadResponse.ok) {
         const errorText = await directUploadResponse.text();
         console.error('Direct upload error:', errorText);
-        console.error('Response status:', directUploadResponse.status);
-        console.error('Response headers:', Object.fromEntries(directUploadResponse.headers.entries()));
         throw new BadRequestException(`Failed to get direct upload URL: ${errorText}`);
       }
 
       const directUploadResult = await directUploadResponse.json();
-      console.log('Direct upload result:', directUploadResult);
-      
       const { uploadURL, id } = directUploadResult.result;
 
       if (!uploadURL || !id) {
         throw new BadRequestException('Invalid response from Cloudflare: missing uploadURL or id');
       }
 
-      console.log('Got upload URL:', uploadURL);
-      console.log('Image ID:', id);
-
       // Step 2: Upload the image to the direct upload URL
       const uploadFormData = new FormData();
-      uploadFormData.append('file', file.buffer, {
-        filename: file.originalname,
-        contentType: file.mimetype,
-      });
+      uploadFormData.append('file', new Blob([file.buffer]), file.originalname);
 
-      console.log('Uploading to direct URL...');
       const uploadResponse = await fetch(uploadURL, {
         method: 'POST',
         body: uploadFormData as any,
+        headers: {
+          'Authorization': `Bearer ${this.apiToken}`
+        },
       });
-
-      console.log('Upload response status:', uploadResponse.status);
 
       if (!uploadResponse.ok) {
         const errorText = await uploadResponse.text();
-        console.error('Upload error:', errorText);
+        console.error('Image upload failed:', errorText);
         throw new BadRequestException(`Image upload failed: ${errorText}`);
       }
 
       const uploadResult = await uploadResponse.json();
-      console.log('Upload result:', uploadResult);
 
-      // Get the image URL - Cloudflare Images returns variants
+      // Build final image URL
       let imageUrl = '';
-      if (uploadResult.result && uploadResult.result.variants && uploadResult.result.variants.length > 0) {
+      if (uploadResult.result?.variants?.length > 0) {
         imageUrl = uploadResult.result.variants[0];
       } else {
-        // Fallback: construct the URL manually
         imageUrl = `https://imagedelivery.net/${this.accountId}/${id}/public`;
       }
 
-      console.log('Final image URL:', imageUrl);
-
       return {
-        id: id,
+        id,
         url: imageUrl,
         filename: file.originalname,
         size: file.size,
