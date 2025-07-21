@@ -137,7 +137,7 @@ export class CloudflareService {
       headers: {
         'Authorization': `Bearer ${this.apiToken}`,
       },
-      body: formData,
+      body: formData as any,  
     });
 
     if (!response.ok) {
@@ -281,7 +281,7 @@ export class CloudflareService {
           'Authorization': `Bearer ${this.apiToken}`,
           ...directUploadFormData.getHeaders(),
         },
-        body: directUploadFormData,
+        body: directUploadFormData as any,
       });
 
       console.log('Direct upload response status:', directUploadResponse.status);
@@ -317,7 +317,7 @@ export class CloudflareService {
       console.log('Uploading to direct URL...');
       const uploadResponse = await fetch(uploadURL, {
         method: 'POST',
-        body: uploadFormData,
+        body: uploadFormData as any,
       });
 
       console.log('Upload response status:', uploadResponse.status);
@@ -406,7 +406,7 @@ export class CloudflareService {
       headers: {
         'Authorization': `Bearer ${this.apiToken}`,
       },
-      body: formData,
+      body: formData as any,
     });
 
     if (!response.ok) {
