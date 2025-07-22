@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsArray } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateLessonDto {
@@ -26,4 +26,14 @@ export class CreateLessonDto {
   @IsString()
   @IsOptional()
   videoId?: string;
+
+  @ApiProperty({
+    description: 'Array of material IDs to associate with this lesson',
+    example: ['material-uuid-1', 'material-uuid-2'],
+    required: false,
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  materialIds?: string[];
 } 

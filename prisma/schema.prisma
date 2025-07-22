@@ -73,13 +73,15 @@ model Lesson {
   content     String?
   courseId    String
   course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  // Video fields for lesson video
   videoId     String?
   videoUrl    String?
   videoThumbnail String?
   videoDuration Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  // One-to-many relationship with materials
+  materials   Material[]
 }
 
 model Material {
@@ -87,7 +89,9 @@ model Material {
   title       String
   fileUrl     String?
   courseId    String
+  lessonId    String?  // Foreign key to lesson
   course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson      Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

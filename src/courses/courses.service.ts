@@ -184,15 +184,19 @@ export class CoursesService {
       }
     }
 
-    return this.prisma.lesson.create({
-      data: {
-        ...data,
-        courseId,
-        videoUrl,
-        videoThumbnail,
-        videoDuration,
-      },
-    });
+    try {
+      return this.prisma.lesson.create({
+        data: {
+          ...data,
+          courseId,
+          videoUrl,
+          videoThumbnail,
+          videoDuration,
+        },
+      });
+    } catch (error) {
+      throw new BadRequestException(`Failed to create lesson: ${error.message}`);
+    }
   }
 
   async addMaterial(courseId: string, data: Omit<Prisma.MaterialUncheckedCreateInput, 'courseId'>) {
