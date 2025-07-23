@@ -8,9 +8,10 @@ dotenv.config();
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  console.log(process.env.ALLOWED_ORIGINS?.split(','))
   // CORS configuration for Render deployment
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001'],
+    origin: '*',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
