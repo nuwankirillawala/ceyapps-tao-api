@@ -38,7 +38,7 @@ model Course {
   demoVideoUrl String?
   demoVideoThumbnail String?
   demoVideoDuration Int?
-  courseDuration String
+  courseDuration String?
   level Level @default(BEGINNER)
   category Category @default(BARTENDING)
   lessons     Lesson[]

@@ -1,7 +1,7 @@
 import { IsString, IsOptional, IsUUID, IsNumber, IsArray, ValidateNested, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { Level, Category } from '@prisma/client';
+import { Level, Category } from '../enums/course.enums';
 
 export class CreatePricingDto {
   @ApiProperty({
@@ -66,10 +66,11 @@ export class CreateCourseDto {
   @ApiProperty({
     description: 'Course duration in hours',
     example: '10 hours',
-    required: true,
+    required: false,
   })
   @IsString()
-  courseDuration: string;
+  @IsOptional()
+  courseDuration?: string;
 
   @ApiProperty({
     description: 'Course level',

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudflareService } from '../cloudflare/cloudflare.service';
 import type { Prisma } from '@prisma/client';
-import { Level, Category } from '@prisma/client';
+import { Level, Category } from './enums/course.enums';
 import { CreateCourseDto } from './dto/create-course.dto';
 
 @Injectable()
@@ -63,7 +63,7 @@ export class CoursesService {
           demoVideoUrl,
           demoVideoThumbnail,
           demoVideoDuration,
-          courseDuration: data.courseDuration,
+          courseDuration: data.courseDuration || null,
           level: data.level,
           category: data.category,
         },

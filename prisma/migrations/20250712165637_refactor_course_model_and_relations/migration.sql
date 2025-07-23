@@ -11,9 +11,23 @@ CREATE TYPE "Level" AS ENUM ('BEGINNER', 'INTERMEDIATE', 'ADVANCED');
 CREATE TYPE "Category" AS ENUM ('BARTENDING', 'MIXOLOGY', 'COCKTAILS', 'WINE', 'BEER');
 
 -- AlterTable
-ALTER TABLE "Course" ADD COLUMN     "category" "Category" NOT NULL DEFAULT 'BARTENDING',
-ADD COLUMN     "courseDuration" TEXT NOT NULL,
-ADD COLUMN     "level" "Level" NOT NULL DEFAULT 'BEGINNER';
+-- First add the columns as nullable
+ALTER TABLE "Course" ADD COLUMN     "category" "Category" DEFAULT 'BARTENDING',
+ADD COLUMN     "courseDuration" TEXT,
+ADD COLUMN     "level" "Level" DEFAULT 'BEGINNER';
+
+-- Update existing records to have default values
+UPDATE "Course" SET "courseDuration" = 'Not specified' WHERE "courseDuration" IS NULL;
+UPDATE "Course" SET "category" = 'BARTENDING' WHERE "category" IS NULL;
+UPDATE "Course" SET "level" = 'BEGINNER' WHERE "level" IS NULL;
+
+-- Now make the columns NOT NULL (except courseDuration which stays optional)
+ALTER TABLE "Course" ALTER COLUMN "category" SET NOT NULL,
+ALTER COLUMN "level" SET NOT NULL;
+
+-- Remove the defaults since they're now NOT NULL
+ALTER TABLE "Course" ALTER COLUMN "category" DROP DEFAULT,
+ALTER COLUMN "level" DROP DEFAULT;
 
 -- CreateTable
 CREATE TABLE "Pricing" (
