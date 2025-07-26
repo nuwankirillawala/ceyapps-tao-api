@@ -8,6 +8,8 @@ import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+
 
 @ApiTags('users')
 @Controller('user')
@@ -99,5 +101,12 @@ export class UserController {
     @Body() assignRoleDto: AssignRoleDto,
   ) {
     return this.userService.assignRole(userId, assignRoleDto.role);
+  }
+
+  @Post('create-user')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async createUser(@Body() createUserDto: CreateUserDto) { 
+    return this.userService.createUser(createUserDto);
   }
 }

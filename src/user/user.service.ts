@@ -3,6 +3,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Role, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { CreateUserDto } from './dto/create-user.dto';
 
 // Define a type for user data without password
 type UserWithoutPassword = Omit<User, 'password'>;
@@ -12,12 +13,7 @@ export class UserService {
   constructor(private prisma: PrismaService) {}
 
   // ✅ Create a user in DB
-  async createUser(data: {
-    email: string;
-    password: string;
-    name: string;
-    role?: Role;
-  }): Promise<User> {
+  async createUser(data: CreateUserDto): Promise<User> {
     return this.prisma.user.create({ data });
   }
 
