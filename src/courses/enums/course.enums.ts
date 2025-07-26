@@ -1,0 +1,13 @@
+export enum Level {
+  BEGINNER = 'BEGINNER',
+  INTERMEDIATE = 'INTERMEDIATE',
+  ADVANCED = 'ADVANCED',
+}
+
+export enum Category {
+  BARTENDING = 'BARTENDING',
+  MIXOLOGY = 'MIXOLOGY',
+  COCKTAILS = 'COCKTAILS',
+  WINE = 'WINE',
+  BEER = 'BEER',
+} 
