@@ -167,7 +167,7 @@ export class CoursesService {
     return course;
   }
 
-  async addLesson(courseId: string, data: Omit<Prisma.LessonUncheckedCreateInput, 'courseId'> & { videoId?: string }) {
+  async addLesson(courseId: string, data: Omit<Prisma.LessonUncheckedCreateInput, 'courseId'> & { videoId?: string; materialIds?: string[] }) {
     // If videoId is provided, get video details from Cloudflare
     let videoUrl: string | undefined;
     let videoThumbnail: string | undefined;
@@ -184,15 +184,61 @@ export class CoursesService {
       }
     }
 
+    // Extract materialIds from data
+    const { materialIds, ...lessonData } = data;
+
     try {
-      return this.prisma.lesson.create({
-        data: {
-          ...data,
-          courseId,
-          videoUrl,
-          videoThumbnail,
-          videoDuration,
-        },
+      // Use transaction to create lesson and materials together
+      return this.prisma.$transaction(async (prisma) => {
+        // Create the lesson
+        const lesson = await prisma.lesson.create({
+          data: {
+            ...lessonData,
+            courseId,
+            videoUrl,
+            videoThumbnail,
+            videoDuration,
+          },
+        });
+
+        // Create materials if materialIds are provided
+        if (materialIds && materialIds.length > 0) {
+          const materialPromises = materialIds.map(async (materialId) => {
+            // Get file details from Cloudflare
+            try {
+              const fileDetails = await this.cloudflareService.getFileDetails(materialId);
+              
+              return prisma.material.create({
+                data: {
+                  title: fileDetails.filename || `Material ${materialId}`,
+                  fileUrl: fileDetails.url,
+                  courseId,
+                  lessonId: lesson.id,
+                },
+              });
+            } catch (error) {
+              console.error(`Failed to get file details for ${materialId}:`, error);
+              // Create material with basic info if file details can't be retrieved
+              return prisma.material.create({
+                data: {
+                  title: `Material ${materialId}`,
+                  courseId,
+                  lessonId: lesson.id,
+                },
+              });
+            }
+          });
+
+          await Promise.all(materialPromises);
+        }
+
+        // Return lesson with materials
+        return prisma.lesson.findUnique({
+          where: { id: lesson.id },
+          include: {
+            materials: true,
+          },
+        });
       });
     } catch (error) {
       throw new BadRequestException(`Failed to create lesson: ${error.message}`);
