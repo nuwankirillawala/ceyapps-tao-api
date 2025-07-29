@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Put, Patch, Body, Req, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Patch, Body, Req, Param, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { RolesGuard } from 'src/auth/roles.guard';
@@ -9,6 +9,10 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { AdminCreateUserDto } from './dto/admin-create-user.dto';
+import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 
 @ApiTags('users')
@@ -61,10 +65,80 @@ export class UserController {
     return this.userService.logout(req.user.userId);
   }
 
-  @Patch('profile')
+  @Put('profile')
   @UseGuards(JwtAuthGuard)
-  async updateProfile(@Req() req, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.updateUser(req.user.userId, updateUserDto);
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Profile updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        email: { type: 'string' },
+        name: { type: 'string' },
+        phoneNumber: { type: 'string' },
+        role: { type: 'string' },
+        profileImage: { type: 'string' },
+        createdAt: { type: 'string' },
+        updatedAt: { type: 'string' }
+      }
+    }
+  })
+  async updateProfile(@Req() req, @Body() updateProfileDto: UpdateProfileDto) {
+    return this.userService.updateProfile(req.user.userId, updateProfileDto);
+  }
+
+  @Post('profile/image')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('image'))
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        image: {
+          type: 'string',
+          format: 'binary',
+          description: 'Profile image file (JPEG, PNG, GIF, WebP, SVG) up to 10MB'
+        }
+      },
+      required: ['image']
+    }
+  })
+  @ApiOperation({ 
+    summary: 'Upload profile image',
+    description: 'Upload a profile image for the current user. Accepts image files (JPEG, PNG, GIF, WebP, SVG) up to 10MB.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Profile image uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        email: { type: 'string' },
+        name: { type: 'string' },
+        phoneNumber: { type: 'string' },
+        role: { type: 'string' },
+        profileImage: { type: 'string' },
+        createdAt: { type: 'string' },
+        updatedAt: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Invalid file type or size' 
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  async uploadProfileImage(@Req() req, @UploadedFile() file: Express.Multer.File) {
+    return this.userService.uploadProfileImage(req.user.userId, file);
   }
 
   @Post('request-password-reset')
@@ -103,10 +177,58 @@ export class UserController {
     return this.userService.assignRole(userId, assignRoleDto.role);
   }
 
-  @Post('create-user')
+  @Post('admin/create-user')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
-  async createUser(@Body() createUserDto: CreateUserDto) { 
-    return this.userService.createUser(createUserDto);
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new user (Admin only)' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'User created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        email: { type: 'string' },
+        name: { type: 'string' },
+        phoneNumber: { type: 'string' },
+        role: { type: 'string' },
+        profileImage: { type: 'string' },
+        createdAt: { type: 'string' },
+        updatedAt: { type: 'string' }
+      }
+    }
+  })
+  async createUserByAdmin(@Body() adminCreateUserDto: AdminCreateUserDto) { 
+    return this.userService.createUserByAdmin(adminCreateUserDto);
+  }
+
+  @Put('admin/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a user (Admin only)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'User updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        email: { type: 'string' },
+        name: { type: 'string' },
+        phoneNumber: { type: 'string' },
+        role: { type: 'string' },
+        profileImage: { type: 'string' },
+        createdAt: { type: 'string' },
+        updatedAt: { type: 'string' }
+      }
+    }
+  })
+  async updateUserByAdmin(
+    @Param('userId') userId: string,
+    @Body() adminUpdateUserDto: AdminUpdateUserDto
+  ) { 
+    return this.userService.updateUserByAdmin(userId, adminUpdateUserDto);
   }
 }

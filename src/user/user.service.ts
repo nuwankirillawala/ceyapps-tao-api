@@ -4,17 +4,172 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { Role, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
+import { AdminCreateUserDto } from './dto/admin-create-user.dto';
+import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { CloudflareService } from 'src/cloudflare/cloudflare.service';
 
 // Define a type for user data without password
 type UserWithoutPassword = Omit<User, 'password'>;
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cloudflareService: CloudflareService,
+  ) {}
 
   // ✅ Create a user in DB
   async createUser(data: CreateUserDto): Promise<User> {
     return this.prisma.user.create({ data });
+  }
+
+  // ✅ Create a user by admin
+  async createUserByAdmin(data: AdminCreateUserDto): Promise<UserWithoutPassword> {
+    // Check if email already exists
+    const existingUser = await this.findByEmail(data.email);
+    if (existingUser) {
+      throw new BadRequestException('Email already exists');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        ...data,
+        password: hashedPassword,
+        role: data.role || Role.STUDENT,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phoneNumber: true,
+        role: true,
+        profileImage: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return user as UserWithoutPassword;
+  }
+
+  // ✅ Update user by admin
+  async updateUserByAdmin(userId: string, data: AdminUpdateUserDto): Promise<UserWithoutPassword> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // If email is being updated, check for uniqueness
+    if (data.email && data.email !== user.email) {
+      const existingUser = await this.findByEmail(data.email);
+      if (existingUser) {
+        throw new BadRequestException('Email already exists');
+      }
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
+    if (data.role !== undefined) updateData.role = data.role;
+    
+    // Hash password if provided
+    if (data.password) {
+      updateData.password = await bcrypt.hash(data.password, 10);
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phoneNumber: true,
+        role: true,
+        profileImage: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return updatedUser as UserWithoutPassword;
+  }
+
+  // ✅ Update user profile (self-update)
+  async updateProfile(userId: string, data: UpdateProfileDto): Promise<UserWithoutPassword> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // If email is being updated, check for uniqueness
+    if (data.email && data.email !== user.email) {
+      const existingUser = await this.findByEmail(data.email);
+      if (existingUser) {
+        throw new BadRequestException('Email already exists');
+      }
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phoneNumber: true,
+        role: true,
+        profileImage: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return updatedUser as UserWithoutPassword;
+  }
+
+  // ✅ Upload profile image
+  async uploadProfileImage(userId: string, file: Express.Multer.File): Promise<UserWithoutPassword> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Upload image to Cloudflare
+    const uploadResult = await this.cloudflareService.uploadImage(file, {
+      userId,
+      type: 'profile',
+    });
+
+    // Update user with new profile image URL
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { profileImage: uploadResult.url },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phoneNumber: true,
+        role: true,
+        profileImage: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return updatedUser as UserWithoutPassword;
   }
 
   // 🔍 Find a user by email
@@ -126,7 +281,9 @@ export class UserService {
         id: true,
         email: true,
         name: true,
+        phoneNumber: true,
         role: true,
+        profileImage: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -146,7 +303,9 @@ export class UserService {
         id: true,
         email: true,
         name: true,
+        phoneNumber: true,
         role: true,
+        profileImage: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -169,7 +328,9 @@ export class UserService {
         id: true,
         email: true,
         name: true,
+        phoneNumber: true,
         role: true,
+        profileImage: true,
         createdAt: true,
         updatedAt: true,
       },
