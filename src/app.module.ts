@@ -8,6 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { CoursesModule } from './courses/courses.module';
 import { RolesModule } from './roles/roles.module';
 import { CloudflareModule } from './cloudflare/cloudflare.module';
+import { AnnouncementsModule } from './announcements/announcements.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { CloudflareModule } from './cloudflare/cloudflare.module';
     CoursesModule, 
     RolesModule,
     CloudflareModule,
+    AnnouncementsModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

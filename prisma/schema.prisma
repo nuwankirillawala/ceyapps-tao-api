@@ -26,6 +26,12 @@ model User {
   
   // Add relationship to courses (if users can create courses)
   courses   Course[] @relation("UserCourses")
+  // Add relationship to announcements (if users can create announcements)
+  announcements Announcement[] @relation("UserAnnouncements")
+  // Support and e-commerce relationships
+  supportTickets SupportTicket[] @relation("UserSupportTickets")
+  orders        Order[] @relation("UserOrders")
+  passwordResets PasswordReset[] @relation("UserPasswordResets")
 }
 
 model Course {
@@ -45,10 +51,12 @@ model Course {
   category Category @default(BARTENDING)
   lessons     Lesson[]
   materials   Material[]
+  announcements Announcement[] @relation("CourseAnnouncements")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   coursePricings CoursePricing[]
+  orderItems     OrderItem[] @relation("CourseOrders")
 }
 
 model Pricing {
@@ -127,4 +135,125 @@ enum Category {
   COCKTAILS
   WINE
   BEER
+}
+
+enum AnnouncementType {
+  ALL_USERS
+  PUBLIC_USERS
+  REGISTERED_USERS
+  COURSE_STUDENTS
+  INSTRUCTORS
+  SPECIFIC_ROLES
+  SPECIFIC_USERS
+  PROMOTIONAL
+  SYSTEM_UPDATE
+}
+
+enum AnnouncementPriority {
+  P1
+  P2
+  P3
+}
+
+enum AnnouncementCategory {
+  GENERAL
+  PROMOTION
+  COURSE_UPDATE
+  SYSTEM_MAINTENANCE
+  NEW_FEATURE
+  INSTRUCTOR_ANNOUNCEMENT
+}
+
+enum AnnouncementDisplayType {
+  BANNER
+  NOTIFICATION
+  SIDEBAR
+  EMAIL
+  IN_APP
+}
+
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  content     String
+  type        AnnouncementType
+  priority    AnnouncementPriority @default(P3)
+  category    AnnouncementCategory @default(GENERAL)
+  displayType AnnouncementDisplayType @default(IN_APP)
+  
+  // Target fields based on type
+  courseId    String?  // For COURSE_STUDENTS type
+  course      Course?  @relation("CourseAnnouncements", fields: [courseId], references: [id], onDelete: Cascade)
+  
+  targetRoles String[] // For SPECIFIC_ROLES type - JSON array of role names
+  targetUserIds String[] // For SPECIFIC_USERS type - JSON array of user IDs
+  
+  // Metadata
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime?
+  startsAt    DateTime? // When announcement should become visible
+  createdBy   String
+  creator     User     @relation("UserAnnouncements", fields: [createdBy], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Enhanced features
+  actionUrl   String?  // URL for clickable announcements
+  actionText  String?  // Text for action button
+  sendEmail   Boolean  @default(false) // Whether to send email notification
+  showAsBanner Boolean @default(false) // Whether to show as banner on homepage
+  imageUrl    String?  // Image URL for the announcement
+  tags        String[] // Tags for categorizing announcements
+}
+
+// Support and Help models
+model SupportTicket {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("UserSupportTickets", fields: [userId], references: [id], onDelete: Cascade)
+  subject     String
+  message     String
+  category    String   // BILLING, TECHNICAL, GENERAL, etc.
+  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  email       String?
+  contactInfo String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// E-commerce models
+model Order {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("UserOrders", fields: [userId], references: [id], onDelete: Cascade)
+  status      String   @default("PENDING") // PENDING, PAID, CANCELLED, REFUNDED
+  totalAmount Float
+  currency    String   @default("USD")
+  paymentMethodId String?
+  stripePaymentIntentId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  orderItems  OrderItem[]
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course   @relation("CourseOrders", fields: [courseId], references: [id])
+  price       Float
+  createdAt   DateTime @default(now())
+}
+
+// Password reset model
+model PasswordReset {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation("UserPasswordResets", fields: [userId], references: [id], onDelete: Cascade)
+  token       String   @unique
+  expiresAt   DateTime
+  isUsed      Boolean  @default(false)
+  createdAt   DateTime @default(now())
 }
