@@ -5,6 +5,10 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { AddPaymentMethodDto, UpdatePaymentMethodDto, SetDefaultPaymentMethodDto } from './dto/payment-method.dto';
 import { ContactSupportDto, FaqQueryDto, HelpCategory } from './dto/help.dto';
+import { CreateFaqDto, UpdateFaqDto } from './dto/faq.dto';
+import { CreateContactDetailsDto, UpdateContactDetailsDto } from './dto/contact-details.dto';
+import { CreateAvailableCountryDto, UpdateAvailableCountryDto } from './dto/available-country.dto';
+import { CreateTrendingCourseDto, UpdateTrendingCourseDto } from './dto/trending-course.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -398,5 +402,541 @@ export class SettingsService {
     }
 
     return ticket;
+  }
+
+  // ===== ADMIN SETTINGS METHODS =====
+
+  // FAQ Management
+  async getAllFaqs(page: number = 1, limit: number = 10, isActive?: boolean) {
+    const skip = (page - 1) * limit;
+    
+    const where = isActive !== undefined ? { isActive } : {};
+    
+    const [faqs, total] = await Promise.all([
+      this.prisma.fAQ.findMany({
+        where,
+        orderBy: { index: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.fAQ.count({ where }),
+    ]);
+
+    return {
+      faqs,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getFaqById(id: string) {
+    const faq = await this.prisma.fAQ.findUnique({
+      where: { id },
+    });
+
+    if (!faq) {
+      throw new NotFoundException('FAQ not found');
+    }
+
+    return faq;
+  }
+
+  async createFaq(createFaqDto: CreateFaqDto) {
+    // Check if index is already taken
+    const existingFaq = await this.prisma.fAQ.findUnique({
+      where: { index: createFaqDto.index },
+    });
+
+    if (existingFaq) {
+      throw new BadRequestException(`FAQ with index ${createFaqDto.index} already exists`);
+    }
+
+    return this.prisma.fAQ.create({
+      data: createFaqDto,
+    });
+  }
+
+  async updateFaq(id: string, updateFaqDto: UpdateFaqDto) {
+    const faq = await this.prisma.fAQ.findUnique({
+      where: { id },
+    });
+
+    if (!faq) {
+      throw new NotFoundException('FAQ not found');
+    }
+
+    // If updating index, check if it's already taken by another FAQ
+    if (updateFaqDto.index && updateFaqDto.index !== faq.index) {
+      const existingFaq = await this.prisma.fAQ.findUnique({
+        where: { index: updateFaqDto.index },
+      });
+
+      if (existingFaq) {
+        throw new BadRequestException(`FAQ with index ${updateFaqDto.index} already exists`);
+      }
+    }
+
+    return this.prisma.fAQ.update({
+      where: { id },
+      data: updateFaqDto,
+    });
+  }
+
+  async deleteFaq(id: string) {
+    const faq = await this.prisma.fAQ.findUnique({
+      where: { id },
+    });
+
+    if (!faq) {
+      throw new NotFoundException('FAQ not found');
+    }
+
+    await this.prisma.fAQ.delete({
+      where: { id },
+    });
+
+    return { message: 'FAQ deleted successfully' };
+  }
+
+  async toggleFaqStatus(id: string) {
+    const faq = await this.prisma.fAQ.findUnique({
+      where: { id },
+    });
+
+    if (!faq) {
+      throw new NotFoundException('FAQ not found');
+    }
+
+    return this.prisma.fAQ.update({
+      where: { id },
+      data: { isActive: !faq.isActive },
+    });
+  }
+
+  // Contact Details Management
+  async getAllContactDetails(page: number = 1, limit: number = 10, type?: string, isActive?: boolean) {
+    const skip = (page - 1) * limit;
+    
+    const where: any = {};
+    if (isActive !== undefined) where.isActive = isActive;
+    if (type) where.type = type;
+    
+    const [contactDetails, total] = await Promise.all([
+      this.prisma.contactDetails.findMany({
+        where,
+        orderBy: { order: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.contactDetails.count({ where }),
+    ]);
+
+    return {
+      contactDetails,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getContactDetailById(id: string) {
+    const contactDetail = await this.prisma.contactDetails.findUnique({
+      where: { id },
+    });
+
+    if (!contactDetail) {
+      throw new NotFoundException('Contact detail not found');
+    }
+
+    return contactDetail;
+  }
+
+  async createContactDetail(createContactDetailsDto: CreateContactDetailsDto) {
+    // Check if type and label combination already exists
+    const existingContact = await this.prisma.contactDetails.findFirst({
+      where: {
+        type: createContactDetailsDto.type,
+        label: createContactDetailsDto.label,
+      },
+    });
+
+    if (existingContact) {
+      throw new BadRequestException(`Contact detail with type ${createContactDetailsDto.type} and label ${createContactDetailsDto.label} already exists`);
+    }
+
+    return this.prisma.contactDetails.create({
+      data: createContactDetailsDto,
+    });
+  }
+
+  async updateContactDetail(id: string, updateContactDetailsDto: UpdateContactDetailsDto) {
+    const contactDetail = await this.prisma.contactDetails.findUnique({
+      where: { id },
+    });
+
+    if (!contactDetail) {
+      throw new NotFoundException('Contact detail not found');
+    }
+
+    // If updating type and label, check if combination already exists
+    if (updateContactDetailsDto.type && updateContactDetailsDto.label) {
+      const existingContact = await this.prisma.contactDetails.findFirst({
+        where: {
+          type: updateContactDetailsDto.type,
+          label: updateContactDetailsDto.label,
+          id: { not: id }, // Exclude current record
+        },
+      });
+
+      if (existingContact) {
+        throw new BadRequestException(`Contact detail with type ${updateContactDetailsDto.type} and label ${updateContactDetailsDto.label} already exists`);
+      }
+    }
+
+    return this.prisma.contactDetails.update({
+      where: { id },
+      data: updateContactDetailsDto,
+    });
+  }
+
+  async deleteContactDetail(id: string) {
+    const contactDetail = await this.prisma.contactDetails.findUnique({
+      where: { id },
+    });
+
+    if (!contactDetail) {
+      throw new NotFoundException('Contact detail not found');
+    }
+
+    await this.prisma.contactDetails.delete({
+      where: { id },
+    });
+
+    return { message: 'Contact detail deleted successfully' };
+  }
+
+  // Available Countries Management
+  async getAllCountries(page: number = 1, limit: number = 10, isActive?: boolean) {
+    const skip = (page - 1) * limit;
+    
+    const where = isActive !== undefined ? { isActive } : {};
+    
+    const [countries, total] = await Promise.all([
+      this.prisma.availableCountry.findMany({
+        where,
+        orderBy: { order: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.availableCountry.count({ where }),
+    ]);
+
+    return {
+      countries,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getCountryById(id: string) {
+    const country = await this.prisma.availableCountry.findUnique({
+      where: { id },
+    });
+
+    if (!country) {
+      throw new NotFoundException('Country not found');
+    }
+
+    return country;
+  }
+
+  async createCountry(createCountryDto: CreateAvailableCountryDto) {
+    // Check if country name or code already exists
+    const existingCountry = await this.prisma.availableCountry.findFirst({
+      where: {
+        OR: [
+          { name: createCountryDto.name },
+          { code: createCountryDto.code },
+        ],
+      },
+    });
+
+    if (existingCountry) {
+      throw new BadRequestException(`Country with name ${createCountryDto.name} or code ${createCountryDto.code} already exists`);
+    }
+
+    return this.prisma.availableCountry.create({
+      data: createCountryDto,
+    });
+  }
+
+  async updateCountry(id: string, updateCountryDto: UpdateAvailableCountryDto) {
+    const country = await this.prisma.availableCountry.findUnique({
+      where: { id },
+    });
+
+    if (!country) {
+      throw new NotFoundException('Country not found');
+    }
+
+    // If updating name or code, check if they already exist
+    if (updateCountryDto.name || updateCountryDto.code) {
+      const existingCountry = await this.prisma.availableCountry.findFirst({
+        where: {
+          OR: [
+            ...(updateCountryDto.name ? [{ name: updateCountryDto.name }] : []),
+            ...(updateCountryDto.code ? [{ code: updateCountryDto.code }] : []),
+          ],
+          id: { not: id }, // Exclude current record
+        },
+      });
+
+      if (existingCountry) {
+        throw new BadRequestException(`Country with name ${updateCountryDto.name} or code ${updateCountryDto.code} already exists`);
+      }
+    }
+
+    return this.prisma.availableCountry.update({
+      where: { id },
+      data: updateCountryDto,
+    });
+  }
+
+  async deleteCountry(id: string) {
+    const country = await this.prisma.availableCountry.findUnique({
+      where: { id },
+    });
+
+    if (!country) {
+      throw new NotFoundException('Country not found');
+    }
+
+    await this.prisma.availableCountry.delete({
+      where: { id },
+    });
+
+    return { message: 'Country deleted successfully' };
+  }
+
+  // Trending Courses Management
+  async getAllTrendingCourses(page: number = 1, limit: number = 10, isActive?: boolean) {
+    const skip = (page - 1) * limit;
+    
+    const where = isActive !== undefined ? { isActive } : {};
+    
+    const [trendingCourses, total] = await Promise.all([
+      this.prisma.trendingCourse.findMany({
+        where,
+        include: {
+          course: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              instructorName: true,
+              level: true,
+              category: true,
+            },
+          },
+        },
+        orderBy: { order: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.trendingCourse.count({ where }),
+    ]);
+
+    return {
+      trendingCourses,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getTrendingCourseById(id: string) {
+    const trendingCourse = await this.prisma.trendingCourse.findUnique({
+      where: { id },
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            instructorName: true,
+            level: true,
+            category: true,
+          },
+        },
+      },
+    });
+
+    if (!trendingCourse) {
+      throw new NotFoundException('Trending course not found');
+    }
+
+    return trendingCourse;
+  }
+
+  async createTrendingCourse(createTrendingCourseDto: CreateTrendingCourseDto) {
+    // Check if course exists
+    const course = await this.prisma.course.findUnique({
+      where: { id: createTrendingCourseDto.courseId },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Check if course is already in trending list
+    const existingTrending = await this.prisma.trendingCourse.findUnique({
+      where: { courseId: createTrendingCourseDto.courseId },
+    });
+
+    if (existingTrending) {
+      throw new BadRequestException('Course is already in trending list');
+    }
+
+    // Check if order is already taken
+    if (createTrendingCourseDto.order !== undefined) {
+      const existingOrder = await this.prisma.trendingCourse.findUnique({
+        where: { order: createTrendingCourseDto.order },
+      });
+
+      if (existingOrder) {
+        throw new BadRequestException(`Trending course with order ${createTrendingCourseDto.order} already exists`);
+      }
+    }
+
+    return this.prisma.trendingCourse.create({
+      data: createTrendingCourseDto,
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            instructorName: true,
+            level: true,
+            category: true,
+          },
+        },
+      },
+    });
+  }
+
+  async updateTrendingCourse(id: string, updateTrendingCourseDto: UpdateTrendingCourseDto) {
+    const trendingCourse = await this.prisma.trendingCourse.findUnique({
+      where: { id },
+    });
+
+    if (!trendingCourse) {
+      throw new NotFoundException('Trending course not found');
+    }
+
+    // If updating order, check if it's already taken by another trending course
+    if (updateTrendingCourseDto.order && updateTrendingCourseDto.order !== trendingCourse.order) {
+      const existingOrder = await this.prisma.trendingCourse.findUnique({
+        where: { order: updateTrendingCourseDto.order },
+      });
+
+      if (existingOrder) {
+        throw new BadRequestException(`Trending course with order ${updateTrendingCourseDto.order} already exists`);
+      }
+    }
+
+    return this.prisma.trendingCourse.update({
+      where: { id },
+      data: updateTrendingCourseDto,
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            instructorName: true,
+            level: true,
+            category: true,
+          },
+        },
+      },
+    });
+  }
+
+  async deleteTrendingCourse(id: string) {
+    const trendingCourse = await this.prisma.trendingCourse.findUnique({
+      where: { id },
+    });
+
+    if (!trendingCourse) {
+      throw new NotFoundException('Trending course not found');
+    }
+
+    await this.prisma.trendingCourse.delete({
+      where: { id },
+    });
+
+    return { message: 'Trending course deleted successfully' };
+  }
+
+  // ===== PUBLIC ENDPOINTS =====
+
+  async getActiveFaqs(limit?: number) {
+    const faqs = await this.prisma.fAQ.findMany({
+      where: { isActive: true },
+      orderBy: { index: 'asc' },
+      ...(limit && { take: limit }),
+    });
+
+    return faqs;
+  }
+
+  async getActiveContactDetails(type?: string) {
+    const where: any = { isActive: true };
+    if (type) where.type = type;
+
+    const contactDetails = await this.prisma.contactDetails.findMany({
+      where,
+      orderBy: { order: 'asc' },
+    });
+
+    return contactDetails;
+  }
+
+  async getActiveCountries() {
+    const countries = await this.prisma.availableCountry.findMany({
+      where: { isActive: true },
+      orderBy: { order: 'asc' },
+    });
+
+    return countries;
+  }
+
+  async getActiveTrendingCourses(limit?: number) {
+    const trendingCourses = await this.prisma.trendingCourse.findMany({
+      where: { isActive: true },
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            instructorName: true,
+            level: true,
+            category: true,
+          },
+        },
+      },
+      orderBy: { order: 'asc' },
+      ...(limit && { take: limit }),
+    });
+
+    return trendingCourses;
   }
 }

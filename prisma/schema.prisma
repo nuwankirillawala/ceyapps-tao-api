@@ -57,6 +57,7 @@ model Course {
 
   coursePricings CoursePricing[]
   orderItems     OrderItem[] @relation("CourseOrders")
+  trendingCourses TrendingCourse[] @relation("TrendingCourses")
 }
 
 model Pricing {
@@ -251,9 +252,66 @@ model OrderItem {
 model PasswordReset {
   id          String   @id @default(uuid())
   userId      String
-  user        User     @relation("UserPasswordResets", fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation("UserPasswordResets", fields: [userId], references: [id])
   token       String   @unique
   expiresAt   DateTime
   isUsed      Boolean  @default(false)
   createdAt   DateTime @default(now())
+}
+
+// ===== ADMIN SETTINGS MODELS =====
+
+// FAQ Management
+model FAQ {
+  id        String   @id @default(uuid())
+  title     String
+  question  String
+  answer    String
+  index     Int      @default(1)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([index]) // Ensure unique index for ordering
+}
+
+// Contact Details Management
+model ContactDetails {
+  id          String   @id @default(uuid())
+  type        String   // MOBILE, EMAIL, SOCIAL_MEDIA, ADDRESS
+  label       String   // e.g., "Main Office", "Support Email", "Facebook"
+  value       String   // e.g., "+1234567890", "support@example.com", "facebook.com/company"
+  icon        String?  // Icon class or URL
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([type, label]) // Prevent duplicate entries
+}
+
+// Available Countries Management
+model AvailableCountry {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  code        String   @unique // ISO 2-letter country code
+  flag        String?  // Flag emoji or URL
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Trending Courses Management
+model TrendingCourse {
+  id          String   @id @default(uuid())
+  courseId    String
+  course      Course   @relation("TrendingCourses", fields: [courseId], references: [id], onDelete: Cascade)
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([courseId]) // One trending entry per course
+  @@unique([order]) // Ensure unique order for positioning
 }
