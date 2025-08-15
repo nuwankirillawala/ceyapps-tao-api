@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,108 +8,310 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  phoneNumber String?
-  role      Role     @default(STUDENT)
-  profileImage String? // URL to profile image
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Add relationship to courses (if users can create courses)
-  courses   Course[] @relation("UserCourses")
-  // Add relationship to announcements (if users can create announcements)
-  announcements Announcement[] @relation("UserAnnouncements")
-  // Support and e-commerce relationships
-  supportTickets SupportTicket[] @relation("UserSupportTickets")
-  orders        Order[] @relation("UserOrders")
-  passwordResets PasswordReset[] @relation("UserPasswordResets")
+  id             String           @id @default(uuid())
+  email          String           @unique
+  password       String
+  name           String
+  role           Role             @default(STUDENT)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  phoneNumber    String?
+  profileImage   String?
+  announcements  Announcement[]   @relation("UserAnnouncements")
+  cart           Cart?            @relation("UserCart")
+  courses        Course[]         @relation("UserCourses")
+  orders         Order[]          @relation("UserOrders")
+  passwordResets PasswordReset[]  @relation("UserPasswordResets")
+  supportTickets SupportTicket[]  @relation("UserSupportTickets")
+  enrollments    UserEnrollment[] @relation("UserEnrollments")
+  wishlist       Wishlist[]       @relation("UserWishlist")
 }
 
 model Course {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  instructorId String?
-  instructor  User?     @relation("UserCourses", fields: [instructorId], references: [id])
-  instructorName String?
-  // Video fields for course demo video
-  demoVideoId String?
-  demoVideoUrl String?
+  id                 String           @id @default(uuid())
+  title              String
+  description        String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  instructorId       String?
+  instructorName     String?
+  demoVideoDuration  Int?
+  demoVideoId        String?
   demoVideoThumbnail String?
-  demoVideoDuration Int?
-  courseDuration String?
-  level Level @default(BEGINNER)
-  category Category @default(BARTENDING)
-  lessons     Lesson[]
-  materials   Material[]
-  announcements Announcement[] @relation("CourseAnnouncements")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  coursePricings CoursePricing[]
-  orderItems     OrderItem[] @relation("CourseOrders")
-  trendingCourses TrendingCourse[] @relation("TrendingCourses")
+  demoVideoUrl       String?
+  category           Category         @default(BARTENDING)
+  courseDuration     String?
+  level              Level            @default(BEGINNER)
+  announcements      Announcement[]   @relation("CourseAnnouncements")
+  cartItems          CartItem[]       @relation("CourseCart")
+  instructor         User?            @relation("UserCourses", fields: [instructorId], references: [id])
+  coursePricings     CoursePricing[]
+  lessons            Lesson[]
+  materials          Material[]
+  orderItems         OrderItem[]      @relation("CourseOrders")
+  PricingHistory     PricingHistory[]
+  trendingCourses    TrendingCourse?  @relation("TrendingCourses")
+  enrollments        UserEnrollment[] @relation("CourseEnrollments")
+  wishlist           Wishlist[]       @relation("CourseWishlist")
 }
 
 model Pricing {
-  id String @id @default(uuid())
-  price Float
-  country String
-
+  id             String          @id @default(uuid())
+  price          Float
+  country        String
+  currency       String          @default("USD")
+  region         String?
+  isActive       Boolean         @default(true)
+  validFrom      DateTime        @default(now())
+  validTo        DateTime?
+  discount       Float?
+  originalPrice  Float?
+  pricingTier    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @default(now())
   coursePricings CoursePricing[]
+
+  @@unique([country, region])
 }
 
 model CoursePricing {
-  id         String   @id @default(uuid())
-  course     Course   @relation(fields: [courseId], references: [id])
-  courseId   String
-  pricing    Pricing  @relation(fields: [pricingId], references: [id])
-  pricingId  String
+  id        String   @id @default(uuid())
+  courseId  String
+  pricingId String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  course    Course   @relation(fields: [courseId], references: [id])
+  pricing   Pricing  @relation(fields: [pricingId], references: [id])
 
-  @@unique([courseId, pricingId]) // Optional: prevents duplicate entries
+  @@unique([courseId, pricingId])
+  @@index([courseId, isActive])
 }
 
 model Lesson {
-  id          String   @id @default(uuid())
-  title       String
-  content     String?
-  courseId    String
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  videoId     String?
-  videoUrl    String?
+  id             String     @id @default(uuid())
+  title          String
+  courseId       String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  content        String?
+  videoDuration  Int?
+  videoId        String?
   videoThumbnail String?
-  videoDuration Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // One-to-many relationship with materials
-  materials   Material[]
+  videoUrl       String?
+  course         Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  materials      Material[]
 }
 
 model Material {
-  id          String   @id @default(uuid())
-  title       String
-  fileUrl     String?
-  courseId    String
-  lessonId    String?  // Foreign key to lesson
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lesson      Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  courseId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  fileUrl   String?
+  title     String
+  lessonId  String?
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lesson    Lesson?  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 }
 
-// Custom role management for extended functionality
 model RoleManagement {
   id          String   @id @default(uuid())
   name        String   @unique
   description String?
-  permissions String[] // JSON array of permissions
+  permissions String[]
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Announcement {
+  id            String                  @id @default(uuid())
+  title         String
+  content       String
+  type          AnnouncementType
+  priority      AnnouncementPriority    @default(P3)
+  courseId      String?
+  targetRoles   String[]
+  targetUserIds String[]
+  isActive      Boolean                 @default(true)
+  expiresAt     DateTime?
+  createdBy     String
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  actionText    String?
+  actionUrl     String?
+  category      AnnouncementCategory    @default(GENERAL)
+  displayType   AnnouncementDisplayType @default(IN_APP)
+  imageUrl      String?
+  sendEmail     Boolean                 @default(false)
+  showAsBanner  Boolean                 @default(false)
+  startsAt      DateTime?
+  tags          String[]
+  course        Course?                 @relation("CourseAnnouncements", fields: [courseId], references: [id], onDelete: Cascade)
+  creator       User                    @relation("UserAnnouncements", fields: [createdBy], references: [id])
+}
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  userId      String
+  subject     String
+  message     String
+  category    String
+  status      String   @default("OPEN")
+  email       String?
+  contactInfo String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation("UserSupportTickets", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id                    String           @id @default(uuid())
+  userId                String
+  status                String           @default("PENDING")
+  totalAmount           Float
+  currency              String           @default("USD")
+  paymentMethodId       String?
+  stripePaymentIntentId String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  country               String
+  user                  User             @relation("UserOrders", fields: [userId], references: [id], onDelete: Cascade)
+  orderItems            OrderItem[]
+  enrollments           UserEnrollment[] @relation("OrderEnrollments")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  courseId  String
+  price     Float
+  createdAt DateTime @default(now())
+  course    Course   @relation("CourseOrders", fields: [courseId], references: [id])
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation("UserPasswordResets", fields: [userId], references: [id])
+}
+
+model FAQ {
+  id        String   @id @default(uuid())
+  title     String
+  question  String
+  answer    String
+  index     Int      @unique @default(1)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ContactDetails {
+  id        String   @id @default(uuid())
+  type      String
+  label     String
+  value     String
+  icon      String?
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, label])
+}
+
+model AvailableCountry {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  flag      String?
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TrendingCourse {
+  id        String   @id @default(uuid())
+  courseId  String   @unique
+  order     Int      @unique @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  course    Course   @relation("TrendingCourses", fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  course    Course   @relation("CourseWishlist", fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserWishlist", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation("UserCart", fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  courseId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  course    Course   @relation("CourseCart", fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, courseId])
+}
+
+model UserEnrollment {
+  id             String   @id @default(uuid())
+  userId         String
+  courseId       String
+  orderId        String?
+  enrolledAt     DateTime @default(now())
+  status         String   @default("ACTIVE")
+  progress       Float    @default(0)
+  lastAccessedAt DateTime @updatedAt
+  course         Course   @relation("CourseEnrollments", fields: [courseId], references: [id], onDelete: Cascade)
+  order          Order?   @relation("OrderEnrollments", fields: [orderId], references: [id])
+  user           User     @relation("UserEnrollments", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+model PricingHistory {
+  id           String   @id
+  courseId     String
+  oldPrice     Float
+  newPrice     Float
+  currency     String
+  country      String
+  region       String?
+  changeReason String?
+  changedBy    String?
+  changedAt    DateTime @default(now())
+  Course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([country, changedAt])
+  @@index([courseId, changedAt])
 }
 
 enum Role {
@@ -140,12 +336,12 @@ enum Category {
 
 enum AnnouncementType {
   ALL_USERS
-  PUBLIC_USERS
-  REGISTERED_USERS
   COURSE_STUDENTS
   INSTRUCTORS
   SPECIFIC_ROLES
   SPECIFIC_USERS
+  PUBLIC_USERS
+  REGISTERED_USERS
   PROMOTIONAL
   SYSTEM_UPDATE
 }
@@ -171,147 +367,4 @@ enum AnnouncementDisplayType {
   SIDEBAR
   EMAIL
   IN_APP
-}
-
-model Announcement {
-  id          String   @id @default(uuid())
-  title       String
-  content     String
-  type        AnnouncementType
-  priority    AnnouncementPriority @default(P3)
-  category    AnnouncementCategory @default(GENERAL)
-  displayType AnnouncementDisplayType @default(IN_APP)
-  
-  // Target fields based on type
-  courseId    String?  // For COURSE_STUDENTS type
-  course      Course?  @relation("CourseAnnouncements", fields: [courseId], references: [id], onDelete: Cascade)
-  
-  targetRoles String[] // For SPECIFIC_ROLES type - JSON array of role names
-  targetUserIds String[] // For SPECIFIC_USERS type - JSON array of user IDs
-  
-  // Metadata
-  isActive    Boolean  @default(true)
-  expiresAt   DateTime?
-  startsAt    DateTime? // When announcement should become visible
-  createdBy   String
-  creator     User     @relation("UserAnnouncements", fields: [createdBy], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  // Enhanced features
-  actionUrl   String?  // URL for clickable announcements
-  actionText  String?  // Text for action button
-  sendEmail   Boolean  @default(false) // Whether to send email notification
-  showAsBanner Boolean @default(false) // Whether to show as banner on homepage
-  imageUrl    String?  // Image URL for the announcement
-  tags        String[] // Tags for categorizing announcements
-}
-
-// Support and Help models
-model SupportTicket {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation("UserSupportTickets", fields: [userId], references: [id], onDelete: Cascade)
-  subject     String
-  message     String
-  category    String   // BILLING, TECHNICAL, GENERAL, etc.
-  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
-  email       String?
-  contactInfo String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-// E-commerce models
-model Order {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation("UserOrders", fields: [userId], references: [id], onDelete: Cascade)
-  status      String   @default("PENDING") // PENDING, PAID, CANCELLED, REFUNDED
-  totalAmount Float
-  currency    String   @default("USD")
-  paymentMethodId String?
-  stripePaymentIntentId String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  orderItems  OrderItem[]
-}
-
-model OrderItem {
-  id          String   @id @default(uuid())
-  orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  courseId    String
-  course      Course   @relation("CourseOrders", fields: [courseId], references: [id])
-  price       Float
-  createdAt   DateTime @default(now())
-}
-
-// Password reset model
-model PasswordReset {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation("UserPasswordResets", fields: [userId], references: [id])
-  token       String   @unique
-  expiresAt   DateTime
-  isUsed      Boolean  @default(false)
-  createdAt   DateTime @default(now())
-}
-
-// ===== ADMIN SETTINGS MODELS =====
-
-// FAQ Management
-model FAQ {
-  id        String   @id @default(uuid())
-  title     String
-  question  String
-  answer    String
-  index     Int      @default(1)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([index]) // Ensure unique index for ordering
-}
-
-// Contact Details Management
-model ContactDetails {
-  id          String   @id @default(uuid())
-  type        String   // MOBILE, EMAIL, SOCIAL_MEDIA, ADDRESS
-  label       String   // e.g., "Main Office", "Support Email", "Facebook"
-  value       String   // e.g., "+1234567890", "support@example.com", "facebook.com/company"
-  icon        String?  // Icon class or URL
-  isActive    Boolean  @default(true)
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([type, label]) // Prevent duplicate entries
-}
-
-// Available Countries Management
-model AvailableCountry {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  code        String   @unique // ISO 2-letter country code
-  flag        String?  // Flag emoji or URL
-  isActive    Boolean  @default(true)
-  order       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-// Trending Courses Management
-model TrendingCourse {
-  id          String   @id @default(uuid())
-  courseId    String
-  course      Course   @relation("TrendingCourses", fields: [courseId], references: [id], onDelete: Cascade)
-  order       Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([courseId]) // One trending entry per course
-  @@unique([order]) // Ensure unique order for positioning
 }

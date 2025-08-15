@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudflareService } from '../cloudflare/cloudflare.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -9,6 +9,16 @@ import { CreateFaqDto, UpdateFaqDto } from './dto/faq.dto';
 import { CreateContactDetailsDto, UpdateContactDetailsDto } from './dto/contact-details.dto';
 import { CreateAvailableCountryDto, UpdateAvailableCountryDto } from './dto/available-country.dto';
 import { CreateTrendingCourseDto, UpdateTrendingCourseDto } from './dto/trending-course.dto';
+import { AddToWishlistDto, RemoveFromWishlistDto } from './dto/wishlist.dto';
+import { AddToCartDto, CheckoutDto, EnrollCourseDto, UpdateCartItemDto, RemoveFromCartDto } from './dto/cart.dto';
+import {
+  CreatePricingDto,
+  UpdatePricingDto,
+  CreateCoursePricingDto,
+  UpdateCoursePricingDto,
+  PricingQueryDto,
+  BulkPricingUpdateDto,
+} from './dto/pricing.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -938,5 +948,993 @@ export class SettingsService {
     });
 
     return trendingCourses;
+  }
+
+  // ===== WISHLIST METHODS =====
+
+  async addToWishlist(userId: string, addToWishlistDto: AddToWishlistDto) {
+    // Check if course exists
+    const course = await this.prisma.course.findUnique({
+      where: { id: addToWishlistDto.courseId },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Check if already in wishlist
+    const existingWishlistItem = await this.prisma.wishlist.findUnique({
+      where: {
+        userId_courseId: {
+          userId,
+          courseId: addToWishlistDto.courseId,
+        },
+      },
+    });
+
+    if (existingWishlistItem) {
+      throw new BadRequestException('Course is already in your wishlist');
+    }
+
+    // Add to wishlist
+    const wishlistItem = await this.prisma.wishlist.create({
+      data: {
+        userId,
+        courseId: addToWishlistDto.courseId,
+      },
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            instructorName: true,
+            level: true,
+            category: true,
+            demoVideoThumbnail: true,
+            demoVideoDuration: true,
+            courseDuration: true,
+          },
+        },
+      },
+    });
+
+    return wishlistItem;
+  }
+
+  async removeFromWishlist(userId: string, removeFromWishlistDto: RemoveFromWishlistDto) {
+    // Check if wishlist item exists
+    const wishlistItem = await this.prisma.wishlist.findUnique({
+      where: {
+        userId_courseId: {
+          userId,
+          courseId: removeFromWishlistDto.courseId,
+        },
+      },
+    });
+
+    if (!wishlistItem) {
+      throw new NotFoundException('Course is not in your wishlist');
+    }
+
+    // Remove from wishlist
+    await this.prisma.wishlist.delete({
+      where: {
+        userId_courseId: {
+          userId,
+          courseId: removeFromWishlistDto.courseId,
+        },
+      },
+    });
+
+    return { message: 'Course removed from wishlist successfully' };
+  }
+
+  async getUserWishlist(userId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    const [wishlistItems, total] = await Promise.all([
+      this.prisma.wishlist.findMany({
+        where: { userId },
+        include: {
+          course: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              instructorName: true,
+              level: true,
+              category: true,
+              demoVideoThumbnail: true,
+              demoVideoDuration: true,
+              courseDuration: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.wishlist.count({ where: { userId } }),
+    ]);
+
+    return {
+      items: wishlistItems,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async checkWishlistStatus(userId: string, courseId: string) {
+    const wishlistItem = await this.prisma.wishlist.findUnique({
+      where: {
+        userId_courseId: {
+          userId,
+          courseId,
+        },
+      },
+    });
+
+    return {
+      isInWishlist: !!wishlistItem,
+      addedAt: wishlistItem?.createdAt || null,
+    };
+  }
+
+  // ===== CART METHODS =====
+
+  async getOrCreateCart(userId: string) {
+    let cart = await this.prisma.cart.findUnique({
+      where: { userId },
+      include: {
+        items: {
+          include: {
+            course: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                instructorName: true,
+                level: true,
+                category: true,
+                demoVideoThumbnail: true,
+                demoVideoDuration: true,
+                courseDuration: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!cart) {
+      cart = await this.prisma.cart.create({
+        data: { userId },
+        include: {
+          items: {
+            include: {
+              course: {
+                select: {
+                  id: true,
+                  title: true,
+                  description: true,
+                  instructorName: true,
+                  level: true,
+                  category: true,
+                  demoVideoThumbnail: true,
+                  demoVideoDuration: true,
+                  courseDuration: true
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    return {
+      ...cart,
+      totalCourses: cart.items.length
+    };
+  }
+
+  async addToCart(userId: string, addToCartDto: AddToCartDto) {
+    const { courseId } = addToCartDto;
+
+    // Check if course exists
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId }
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Get or create cart
+    let cart = await this.prisma.cart.findUnique({
+      where: { userId }
+    });
+
+    if (!cart) {
+      cart = await this.prisma.cart.create({
+        data: { userId }
+      });
+    }
+
+    // Check if course is already in cart
+    const existingItem = await this.prisma.cartItem.findUnique({
+      where: {
+        cartId_courseId: {
+          cartId: cart.id,
+          courseId
+        }
+      }
+    });
+
+    if (existingItem) {
+      throw new BadRequestException('Course already in cart');
+    }
+
+    // Add course to cart
+    await this.prisma.cartItem.create({
+      data: {
+        cartId: cart.id,
+        courseId
+      }
+    });
+
+    return { message: 'Course added to cart successfully' };
+  }
+
+  async updateCartItem(userId: string, updateCartItemDto: UpdateCartItemDto) {
+    const cart = await this.prisma.cart.findUnique({
+      where: { userId },
+      include: { items: true },
+    });
+
+    if (!cart) {
+      throw new NotFoundException('Cart not found');
+    }
+
+    const cartItem = cart.items.find(item => item.courseId === updateCartItemDto.courseId);
+
+    if (!cartItem) {
+      throw new NotFoundException('Course not found in cart');
+    }
+
+    // Since quantity was removed, this method now just returns the cart
+    // The cart system is simplified to one course per cart item
+    return this.getOrCreateCart(userId);
+  }
+
+  async removeFromCart(userId: string, removeFromCartDto: RemoveFromCartDto) {
+    const cart = await this.prisma.cart.findUnique({
+      where: { userId },
+      include: { items: true },
+    });
+
+    if (!cart) {
+      throw new NotFoundException('Cart not found');
+    }
+
+    const cartItem = cart.items.find(item => item.courseId === removeFromCartDto.courseId);
+
+    if (!cartItem) {
+      throw new NotFoundException('Course not found in cart');
+    }
+
+    await this.prisma.cartItem.delete({
+      where: { id: cartItem.id },
+    });
+
+    return this.getOrCreateCart(userId);
+  }
+
+  async clearCart(userId: string) {
+    const cart = await this.prisma.cart.findUnique({
+      where: { userId }
+    });
+
+    if (!cart) {
+      throw new NotFoundException('Cart not found');
+    }
+
+    // Delete all cart items
+    await this.prisma.cartItem.deleteMany({
+      where: { cartId: cart.id }
+    });
+
+    return { message: 'Cart cleared successfully' };
+  }
+
+  async getCartSummary(userId: string, country: string = 'US') {
+    const cart = await this.prisma.cart.findUnique({
+      where: { userId },
+      include: {
+        items: {
+          include: {
+            course: true
+          }
+        }
+      }
+    });
+
+    if (!cart) {
+      return {
+        totalCourses: 0,
+        estimatedTotal: 0,
+        currency: 'USD'
+      };
+    }
+
+    // For now, return a simplified summary since pricing is not implemented
+    // TODO: Implement proper pricing logic when CoursePricing is set up
+    return {
+      totalCourses: cart.items.length,
+      estimatedTotal: 0,
+      currency: 'USD'
+    };
+  }
+
+  async checkout(userId: string, checkoutDto: CheckoutDto) {
+    const { courseIds, country, paymentMethodId } = checkoutDto;
+
+    // Get user info
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Verify all courses are in cart
+    const cart = await this.prisma.cart.findUnique({
+      where: { userId },
+      include: {
+        items: {
+          where: {
+            courseId: { in: courseIds }
+          }
+        }
+      }
+    });
+
+    if (!cart) {
+      throw new NotFoundException('Cart not found');
+    }
+
+    if (cart.items.length !== courseIds.length) {
+      throw new BadRequestException('Some courses are not in cart');
+    }
+
+    // Calculate total amount
+    let totalAmount = 0;
+    const orderItems = [];
+
+    for (const courseId of courseIds) {
+      const course = await this.prisma.course.findUnique({
+        where: { id: courseId }
+      });
+
+      if (!course) {
+        throw new NotFoundException(`Course ${courseId} not found`);
+      }
+
+      // For now, use a default price since pricing system is not fully implemented
+      // TODO: Implement proper pricing when CoursePricing is set up
+      const price = 99.99; // Default price
+      totalAmount += price;
+
+      orderItems.push({
+        courseId,
+        courseTitle: course.title,
+        price
+      });
+    }
+
+    // TODO: Integrate with Stripe when package is installed
+    // For now, create a mock payment intent ID
+    const stripePaymentIntentId = `mock_pi_${Date.now()}`;
+
+    // Create order
+    const order = await this.prisma.order.create({
+      data: {
+        userId,
+        status: 'PENDING',
+        totalAmount,
+        currency: 'USD',
+        country,
+        stripePaymentIntentId,
+        orderItems: {
+          create: orderItems.map(item => ({
+            courseId: item.courseId,
+            price: item.price
+          }))
+        },
+        enrollments: {
+          create: courseIds.map(courseId => ({
+            userId,
+            courseId,
+            status: 'ACTIVE'
+          }))
+        }
+      },
+      include: {
+        orderItems: true,
+        enrollments: true
+      }
+    });
+
+    // Remove purchased courses from cart
+    await this.prisma.cartItem.deleteMany({
+      where: {
+        cartId: cart.id,
+        courseId: { in: courseIds }
+      }
+    });
+
+    return {
+      message: 'Checkout completed successfully',
+      orderId: order.id,
+      totalAmount,
+      currency: 'USD',
+      stripePaymentIntentId
+    };
+  }
+
+  // ===== ENROLLMENT METHODS =====
+
+  async enrollCourse(userId: string, enrollCourseDto: EnrollCourseDto) {
+    const { courseId, country, paymentMethodId } = enrollCourseDto;
+
+    // Check if user is already enrolled
+    const existingEnrollment = await this.prisma.userEnrollment.findUnique({
+      where: {
+        userId_courseId: {
+          userId,
+          courseId
+        }
+      }
+    });
+
+    if (existingEnrollment) {
+      throw new ConflictException('User already enrolled in this course');
+    }
+
+    // Get course
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId }
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // For now, use a default price since pricing system is not fully implemented
+    // TODO: Implement proper pricing when CoursePricing is set up
+    const price = 99.99; // Default price
+
+    // TODO: Integrate with Stripe when package is installed
+    // For now, create a mock payment intent ID
+    const stripePaymentIntentId = `mock_pi_${Date.now()}`;
+
+    // Create order for single course
+    const order = await this.prisma.order.create({
+      data: {
+        userId,
+        status: 'PENDING',
+        totalAmount: price,
+        currency: 'USD',
+        country,
+        stripePaymentIntentId,
+        orderItems: {
+          create: {
+            courseId,
+            price
+          }
+        },
+        enrollments: {
+          create: {
+            userId,
+            courseId,
+            status: 'ACTIVE'
+          }
+        }
+      },
+      include: {
+        orderItems: true,
+        enrollments: true
+      }
+    });
+
+    return {
+      message: 'Enrollment completed successfully',
+      orderId: order.id,
+      courseId,
+      price,
+      currency: 'USD',
+      stripePaymentIntentId
+    };
+  }
+
+  // ===== ORDER METHODS =====
+
+  async getUserOrders(userId: string, page: number = 1, limit: number = 10, status?: string) {
+    const skip = (page - 1) * limit;
+
+    const where: any = { userId };
+    if (status) {
+      where.status = status;
+    }
+
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        include: {
+          orderItems: {
+            include: {
+              course: {
+                select: {
+                  id: true,
+                  title: true,
+                  description: true,
+                  instructorName: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      this.prisma.order.count({ where })
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      orders,
+      total,
+      page,
+      limit,
+      totalPages
+    };
+  }
+
+  async getOrderDetails(userId: string, orderId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: orderId,
+        userId
+      },
+      include: {
+        orderItems: {
+          include: {
+            course: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                instructorName: true,
+                level: true,
+                category: true
+              }
+            }
+          }
+        },
+        enrollments: {
+          include: {
+            course: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                instructorName: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    return order;
+  }
+
+  // ===== PRICING METHODS =====
+
+  async createPricing(createPricingDto: CreatePricingDto) {
+    const data: any = { ...createPricingDto };
+    
+    // Set default values for enhanced fields
+    if (!data.currency) data.currency = 'USD';
+    if (!data.isActive) data.isActive = true;
+    if (!data.validFrom) data.validFrom = new Date();
+    if (!data.originalPrice) data.originalPrice = data.price;
+    
+    const pricing = await this.prisma.pricing.create({
+      data
+    });
+
+    return pricing;
+  }
+
+  async getAllPricing(query: PricingQueryDto) {
+    const where: any = {};
+
+    if (query.country) where.country = query.country;
+    if (query.region) where.region = query.region;
+    if (query.currency) where.currency = query.currency;
+    if (query.pricingTier) where.pricingTier = query.pricingTier;
+    if (query.isActive !== undefined) where.isActive = query.isActive;
+    
+    if (query.minPrice || query.maxPrice) {
+      where.price = {};
+      if (query.minPrice) where.price.gte = query.minPrice;
+      if (query.maxPrice) where.price.lte = query.maxPrice;
+    }
+
+    return this.prisma.pricing.findMany({
+      where
+    });
+  }
+
+  async getPricingById(id: string) {
+    const pricing = await this.prisma.pricing.findUnique({
+      where: { id }
+    });
+
+    if (!pricing) {
+      throw new NotFoundException('Pricing not found');
+    }
+
+    return pricing;
+  }
+
+  async updatePricing(id: string, updatePricingDto: UpdatePricingDto) {
+    const existingPricing = await this.prisma.pricing.findUnique({
+      where: { id }
+    });
+
+    if (!existingPricing) {
+      throw new NotFoundException('Pricing not found');
+    }
+
+    const data: any = { ...updatePricingDto };
+    
+    // Update originalPrice if price is being changed
+    if (data.price && data.price !== existingPricing.price) {
+      data.originalPrice = existingPricing.price;
+    }
+    
+    // Set updatedAt to current timestamp
+    data.updatedAt = new Date();
+
+    const pricing = await this.prisma.pricing.update({
+      where: { id },
+      data
+    });
+
+    return pricing;
+  }
+
+  async deletePricing(id: string) {
+    const pricing = await this.prisma.pricing.findUnique({
+      where: { id }
+    });
+
+    if (!pricing) {
+      throw new NotFoundException('Pricing not found');
+    }
+
+    // Check if pricing is being used by any courses
+    const coursePricing = await this.prisma.coursePricing.findFirst({
+      where: { pricingId: id }
+    });
+
+    if (coursePricing) {
+      throw new BadRequestException('Cannot delete pricing that is assigned to courses');
+    }
+
+    await this.prisma.pricing.delete({
+      where: { id }
+    });
+  }
+
+  async createCoursePricing(createCoursePricingDto: CreateCoursePricingDto) {
+    const { courseId, pricingId } = createCoursePricingDto;
+
+    // Check if course exists
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId }
+    });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    // Check if pricing exists
+    const pricing = await this.prisma.pricing.findUnique({
+      where: { id: pricingId }
+    });
+
+    if (!pricing) {
+      throw new NotFoundException('Pricing not found');
+    }
+
+    // Check if course already has this pricing
+    const existingCoursePricing = await this.prisma.coursePricing.findUnique({
+      where: {
+        courseId_pricingId: {
+          courseId,
+          pricingId
+        }
+      }
+    });
+
+    if (existingCoursePricing) {
+      throw new BadRequestException('Course already has this pricing');
+    }
+
+    const coursePricing = await this.prisma.coursePricing.create({
+      data: createCoursePricingDto,
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            instructorName: true,
+            level: true,
+            category: true
+          }
+        },
+        pricing: true
+      }
+    });
+
+    return coursePricing;
+  }
+
+  async getCoursePricing(courseId: string, country?: string, region?: string) {
+    const where: any = {
+      courseId,
+      isActive: true
+    };
+
+    if (country || region) {
+      where.pricing = {};
+      if (country) where.pricing.country = country;
+      if (region) where.pricing.region = region;
+    }
+
+    return this.prisma.coursePricing.findMany({
+      where,
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            instructorName: true,
+            level: true,
+            category: true
+          }
+        },
+        pricing: true
+      }
+    });
+  }
+
+  async updateCoursePricing(id: string, updateCoursePricingDto: UpdateCoursePricingDto) {
+    const coursePricing = await this.prisma.coursePricing.findUnique({
+      where: { id }
+    });
+
+    if (!coursePricing) {
+      throw new NotFoundException('Pricing not found');
+    }
+
+    const updatedCoursePricing = await this.prisma.coursePricing.update({
+      where: { id },
+      data: updateCoursePricingDto,
+      include: {
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            instructorName: true,
+            level: true,
+            category: true
+          }
+        },
+        pricing: true
+      }
+    });
+
+    return updatedCoursePricing;
+  }
+
+  async deleteCoursePricing(id: string) {
+    const coursePricing = await this.prisma.coursePricing.findUnique({
+      where: { id }
+    });
+
+    if (!coursePricing) {
+      throw new NotFoundException('Course pricing not found');
+    }
+
+    await this.prisma.coursePricing.delete({
+      where: { id }
+    });
+  }
+
+  async bulkUpdatePricing(bulkPricingUpdateDto: BulkPricingUpdateDto, userId?: string) {
+    const { courseIds, pricing, changeReason } = bulkPricingUpdateDto;
+
+    // Create or update pricing record
+    let pricingRecord = await this.prisma.pricing.findFirst({
+      where: {
+        country: pricing.country,
+        region: pricing.region || null
+      }
+    });
+
+    if (!pricingRecord) {
+      pricingRecord = await this.createPricing(pricing);
+    } else {
+      pricingRecord = await this.updatePricing(pricingRecord.id, pricing);
+    }
+
+    const results = [];
+
+    for (const courseId of courseIds) {
+      try {
+        // Check if course pricing exists
+        const existingCoursePricing = await this.prisma.coursePricing.findFirst({
+          where: {
+            courseId,
+            pricingId: pricingRecord.id
+          }
+        });
+
+        if (existingCoursePricing) {
+          // Update existing course pricing
+          const updated = await this.updateCoursePricing(existingCoursePricing.id, {
+            courseId,
+            pricingId: pricingRecord.id
+          });
+          results.push(updated);
+        } else {
+          // Create new course pricing
+          const created = await this.createCoursePricing({
+            courseId,
+            pricingId: pricingRecord.id
+          });
+          results.push(created);
+        }
+
+        // Record price change if applicable
+        if (changeReason) {
+          await this.recordPricingChange(
+            pricingRecord,
+            pricingRecord.price,
+            changeReason,
+            courseId,
+            userId
+          );
+        }
+      } catch (error) {
+        console.error(`Failed to update pricing for course ${courseId}:`, error);
+        // Continue with other courses
+      }
+    }
+
+    return results;
+  }
+
+  async getPricingHistory(courseId: string, country?: string, region?: string, limit: number = 50) {
+    // For now, return empty array since pricingHistory table doesn't exist yet
+    // TODO: Implement when pricingHistory table is created
+    return [];
+  }
+
+  async getPricingAnalytics(country?: string, region?: string, startDate?: string, endDate?: string) {
+    const where: any = { isActive: true };
+
+    if (country) where.country = country;
+    if (region) where.region = region;
+
+    const coursePricings = await this.prisma.coursePricing.findMany({
+      where,
+      include: {
+        pricing: true
+      }
+    });
+
+    if (coursePricings.length === 0) {
+      return {
+        totalCourses: 0,
+        averagePrice: 0,
+        priceRange: { min: 0, max: 0 },
+        currencyDistribution: {},
+        regionalPricing: []
+      };
+    }
+
+    const prices = coursePricings.map(cp => cp.pricing.price);
+    const countries = coursePricings.map(cp => cp.pricing.country);
+
+    const currencyDistribution = { USD: coursePricings.length }; // Default to USD for now
+
+    const regionalPricing = countries.reduce((acc, country) => {
+      const countryPricings = coursePricings.filter(cp => cp.pricing.country === country);
+      const avgPrice = countryPricings.reduce((sum, cp) => sum + cp.pricing.price, 0) / countryPricings.length;
+      
+      acc.push({
+        country,
+        averagePrice: Math.round(avgPrice * 100) / 100,
+        courseCount: countryPricings.length
+      });
+      return acc;
+    }, []);
+
+    return {
+      totalCourses: coursePricings.length,
+      averagePrice: Math.round((prices.reduce((sum, price) => sum + price, 0) / prices.length) * 100) / 100,
+      priceRange: {
+        min: Math.min(...prices),
+        max: Math.max(...prices)
+      },
+      currencyDistribution,
+      regionalPricing
+    };
+  }
+
+  async validatePricing(pricingData: CreatePricingDto) {
+    const issues: string[] = [];
+    const warnings: string[] = [];
+
+    // Validate price
+    if (pricingData.price <= 0) {
+      issues.push('Price must be greater than 0');
+    }
+
+    // Check for duplicate pricing in same country
+    const existingPricing = await this.prisma.pricing.findFirst({
+      where: {
+        country: pricingData.country
+      }
+    });
+
+    if (existingPricing) {
+      warnings.push('Pricing already exists for this country');
+    }
+
+    return {
+      isValid: issues.length === 0,
+      issues,
+      warnings
+    };
+  }
+
+  private async recordPricingChange(
+    pricing: any,
+    newPrice: number,
+    changeReason: string,
+    courseId?: string,
+    userId?: string
+  ) {
+    // For now, just log the change since pricingHistory table doesn't exist yet
+    // TODO: Implement when pricingHistory table is created
+    console.log(`Pricing change recorded: Course ${courseId}, Old: ${pricing.price}, New: ${newPrice}, Reason: ${changeReason}`);
   }
 }
