@@ -1101,7 +1101,12 @@ export class SettingsService {
                 category: true,
                 demoVideoThumbnail: true,
                 demoVideoDuration: true,
-                courseDuration: true
+                courseDuration: true,
+                coursePricings: {
+                  select: {
+                    pricing: true
+                  }
+                }
               }
             }
           }
