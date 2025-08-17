@@ -54,6 +54,14 @@ export class CloudflareService {
     this.accountId = this.configService.get<string>('CLOUDFLARE_ACCOUNT_ID');
     this.apiToken = this.configService.get<string>('CLOUDFLARE_API_TOKEN');
     this.r2BucketName = this.configService.get<string>('CLOUDFLARE_R2_BUCKET_NAME');
+    
+    // Debug logging to troubleshoot environment variables
+    console.log('Cloudflare Service Configuration:');
+    console.log('Account ID:', this.accountId);
+    console.log('API Token:', this.apiToken ? '***SET***' : 'NOT SET');
+    console.log('R2 Bucket Name:', this.r2BucketName);
+    console.log('R2 URL:', `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/storage/buckets/${this.r2BucketName}/objects`);
+    
     this.streamUrl = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/stream`;
     this.r2Url = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/storage/buckets/${this.r2BucketName}/objects`;
     this.imagesUrl = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/images/v2/direct_upload`;

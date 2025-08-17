@@ -122,6 +122,15 @@ export class CartSummaryDto {
 
 export class EnrollCourseDto {
   @ApiProperty({
+    description: 'User ID to enroll (optional, defaults to authenticated user)',
+    example: 'user-uuid-123'
+  })
+  @IsString()
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+
+  @ApiProperty({
     description: 'Course ID to enroll in',
     example: 'course-uuid-123'
   })

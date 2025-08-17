@@ -128,7 +128,7 @@ export class CreateCourseDto {
   instructorName?: string;
 
   @ApiProperty({
-    description: 'Demo video ID from Cloudflare Stream',
+    description: 'Demo video ID from Cloudflare Stream (optional)',
     example: 'video-uuid-123',
     required: false,
   })

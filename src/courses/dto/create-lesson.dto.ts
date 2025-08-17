@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateLessonDto {
@@ -7,6 +7,7 @@ export class CreateLessonDto {
     example: 'Introduction to HTML',
   })
   @IsString()
+  @IsNotEmpty()
   title: string;
 
   @ApiProperty({
@@ -19,7 +20,7 @@ export class CreateLessonDto {
   content?: string;
 
   @ApiProperty({
-    description: 'Video ID from Cloudflare Stream',
+    description: 'Video ID from Cloudflare Stream (optional)',
     example: 'video-uuid-123',
     required: false,
   })
@@ -28,7 +29,7 @@ export class CreateLessonDto {
   videoId?: string;
 
   @ApiProperty({
-    description: 'Array of material IDs to associate with this lesson',
+    description: 'Array of material IDs to associate with this lesson (optional)',
     example: ['material-uuid-1', 'material-uuid-2'],
     required: false,
   })

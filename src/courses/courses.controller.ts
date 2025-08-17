@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Patch, Delete, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CoursesService } from './courses.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -9,8 +9,6 @@ import { CreateCourseDto, CreatePricingDto } from './dto/create-course.dto';
 import { CreateLessonDto } from './dto/create-lesson.dto';
 import { CreateMaterialDto } from './dto/create-material.dto';
 import { UpdateCourseDto } from './dto/update-course.dto';
-import { UpdateLessonDto } from './dto/update-lesson.dto';
-import { UpdateMaterialDto } from './dto/update-material.dto';
 
 @ApiTags('courses')
 @Controller('courses')
@@ -81,16 +79,6 @@ export class CoursesController {
     return this.coursesService.getCourses();
   }
 
-  @Get('lessons/:lessonId')
-  async getLessonById(@Param('lessonId') lessonId: string) {
-    return this.coursesService.getLessonById(lessonId);
-  }
-
-  @Get('materials/:materialId')
-  async getMaterialById(@Param('materialId') materialId: string) {
-    return this.coursesService.getMaterialById(materialId);
-  }
-
   @Get(':id')
   @ApiOperation({ summary: 'Get course by ID' })
   @ApiParam({ name: 'id', description: 'Course ID', example: 'course-uuid-123' })
@@ -118,11 +106,47 @@ export class CoursesController {
   }
 
   @Get(':id/lessons')
+  @ApiOperation({ summary: 'Get lessons by course ID' })
+  @ApiParam({ name: 'id', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Lessons retrieved successfully',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: 'lesson-uuid-123' },
+          title: { type: 'string', example: 'Introduction to HTML' },
+          content: { type: 'string', example: 'HTML is the standard markup language...' },
+          courseId: { type: 'string', example: 'course-uuid-123' }
+        }
+      }
+    }
+  })
   async getLessonsByCourseId(@Param('id') courseId: string) {
     return this.coursesService.getLessonsByCourseId(courseId);
   }
 
   @Get(':id/materials')
+  @ApiOperation({ summary: 'Get materials by course ID' })
+  @ApiParam({ name: 'id', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Materials retrieved successfully',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: 'material-uuid-123' },
+          title: { type: 'string', example: 'HTML Cheat Sheet' },
+          fileUrl: { type: 'string', example: 'https://example.com/html-cheatsheet.pdf' },
+          courseId: { type: 'string', example: 'course-uuid-123' }
+        }
+      }
+    }
+  })
   async getMaterialsByCourseId(@Param('id') courseId: string) {
     return this.coursesService.getMaterialsByCourseId(courseId);
   }
@@ -130,6 +154,22 @@ export class CoursesController {
   @Post(':id/lessons')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add lesson to course' })
+  @ApiParam({ name: 'id', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Lesson added successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', example: 'lesson-uuid-123' },
+        title: { type: 'string', example: 'Introduction to HTML' },
+        content: { type: 'string', example: 'HTML is the standard markup language...' },
+        courseId: { type: 'string', example: 'course-uuid-123' }
+      }
+    }
+  })
   async addLesson(
     @Param('id') courseId: string,
     @Body() createLessonDto: CreateLessonDto,
@@ -140,6 +180,22 @@ export class CoursesController {
   @Post(':id/materials')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add material to course' })
+  @ApiParam({ name: 'id', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Material added successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', example: 'material-uuid-123' },
+        title: { type: 'string', example: 'HTML Cheat Sheet' },
+        fileUrl: { type: 'string', example: 'https://example.com/html-cheatsheet.pdf' },
+        courseId: { type: 'string', example: 'course-uuid-123' }
+      }
+    }
+  })
   async addMaterial(
     @Param('id') courseId: string,
     @Body() createMaterialDto: CreateMaterialDto,
@@ -150,6 +206,23 @@ export class CoursesController {
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update course' })
+  @ApiParam({ name: 'id', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Course updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', example: 'course-uuid-123' },
+        title: { type: 'string', example: 'Advanced Web Development' },
+        description: { type: 'string', example: 'Learn advanced web development techniques' },
+        instructorId: { type: 'string', example: 'a1c8add5-4cec-4d31-b9db-a1469cfc521d' },
+        instructorName: { type: 'string', example: 'John Doe' }
+      }
+    }
+  })
   async updateCourse(
     @Param('id') id: string,
     @Body() updateCourseDto: UpdateCourseDto,
@@ -160,44 +233,21 @@ export class CoursesController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete course' })
+  @ApiParam({ name: 'id', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Course deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Course deleted successfully' }
+      }
+    }
+  })
   async deleteCourse(@Param('id') id: string) {
     return this.coursesService.deleteCourse(id);
-  }
-
-  // Lesson management endpoints
-  @Patch('lessons/:lessonId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.INSTRUCTOR)
-  async updateLesson(
-    @Param('lessonId') lessonId: string,
-    @Body() updateLessonDto: UpdateLessonDto,
-  ) {
-    return this.coursesService.updateLesson(lessonId, updateLessonDto);
-  }
-
-  @Delete('lessons/:lessonId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.INSTRUCTOR)
-  async deleteLesson(@Param('lessonId') lessonId: string) {
-    return this.coursesService.deleteLesson(lessonId);
-  }
-
-  // Material management endpoints
-  @Put('materials/:materialId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.INSTRUCTOR)
-  async updateMaterial(
-    @Param('materialId') materialId: string,
-    @Body() updateMaterialDto: UpdateMaterialDto,
-  ) {
-    return this.coursesService.updateMaterial(materialId, updateMaterialDto);
-  }
-
-  @Delete('materials/:materialId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.INSTRUCTOR)
-  async deleteMaterial(@Param('materialId') materialId: string) {
-    return this.coursesService.deleteMaterial(materialId);
   }
 
   // Course pricing management endpoints

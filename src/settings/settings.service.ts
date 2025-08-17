@@ -1460,6 +1460,207 @@ export class SettingsService {
     };
   }
 
+  /**
+   * Get all enrollments with pagination and filtering (Admin/Instructor only)
+   */
+  async getAllEnrollments(filters: {
+    page: number;
+    limit: number;
+    status?: string;
+    courseId?: string;
+    userId?: string;
+  }) {
+    const { page, limit, status, courseId, userId } = filters;
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where: any = {};
+    if (status) where.status = status;
+    if (courseId) where.courseId = courseId;
+    if (userId) where.userId = userId;
+
+    const [enrollments, total] = await Promise.all([
+      this.prisma.userEnrollment.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true
+            }
+          },
+          course: {
+            select: {
+              id: true,
+              title: true,
+              description: true
+            }
+          }
+        },
+        orderBy: { enrolledAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      this.prisma.userEnrollment.count({ where })
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      enrollments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages
+      }
+    };
+  }
+
+  /**
+   * Get enrollments for a specific user
+   */
+  async getUserEnrollments(userId: string, options: {
+    page: number;
+    limit: number;
+    status?: string;
+  }) {
+    const { page, limit, status } = options;
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where: any = { userId };
+    if (status) where.status = status;
+
+    const [enrollments, total] = await Promise.all([
+      this.prisma.userEnrollment.findMany({
+        where,
+        include: {
+          course: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              instructorName: true
+            }
+          }
+        },
+        orderBy: { enrolledAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      this.prisma.userEnrollment.count({ where })
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      enrollments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages
+      }
+    };
+  }
+
+  /**
+   * Get enrollments for a specific course
+   */
+  async getCourseEnrollments(courseId: string, options: {
+    page: number;
+    limit: number;
+    status?: string;
+  }) {
+    const { page, limit, status } = options;
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where: any = { courseId };
+    if (status) where.status = status;
+
+    const [enrollments, total] = await Promise.all([
+      this.prisma.userEnrollment.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true
+            }
+          }
+        },
+        orderBy: { enrolledAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      this.prisma.userEnrollment.count({ where })
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      enrollments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages
+      }
+    };
+  }
+
+  /**
+   * Check if a user is enrolled in a specific course
+   */
+  async isUserEnrolledInCourse(userId: string, courseId: string): Promise<boolean> {
+    const enrollment = await this.prisma.userEnrollment.findUnique({
+      where: {
+        userId_courseId: {
+          userId,
+          courseId
+        }
+      }
+    });
+
+    return !!enrollment && enrollment.status === 'ACTIVE';
+  }
+
+  /**
+   * Get a specific enrollment by ID
+   */
+  async getEnrollmentById(enrollmentId: string) {
+    const enrollment = await this.prisma.userEnrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true
+          }
+        },
+        course: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            instructorName: true
+          }
+        }
+      }
+    });
+
+    if (!enrollment) {
+      throw new NotFoundException('Enrollment not found');
+    }
+
+    return enrollment;
+  }
+
   // ===== ORDER METHODS =====
 
   async getUserOrders(userId: string, page: number = 1, limit: number = 10, status?: string) {
