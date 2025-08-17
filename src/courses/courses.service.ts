@@ -39,7 +39,8 @@ export class CoursesService {
     let demoVideoThumbnail: string | undefined;
     let demoVideoDuration: number | undefined;
 
-    if (data.demoVideoId) {
+    // Filter out empty strings and validate demoVideoId
+    if (data.demoVideoId && data.demoVideoId.trim() !== '') {
       try {
         const videoDetails = await this.cloudflareService.getVideoDetails(data.demoVideoId);
         demoVideoUrl = videoDetails.preview;
@@ -173,7 +174,8 @@ export class CoursesService {
     let videoThumbnail: string | undefined;
     let videoDuration: number | undefined;
 
-    if (data.videoId) {
+    // Filter out empty strings and validate videoId
+    if (data.videoId && data.videoId.trim() !== '') {
       try {
         const videoDetails = await this.cloudflareService.getVideoDetails(data.videoId);
         videoUrl = videoDetails.preview;
@@ -184,8 +186,9 @@ export class CoursesService {
       }
     }
 
-    // Extract materialIds from data
+    // Extract materialIds from data and filter out empty strings
     const { materialIds, ...lessonData } = data;
+    const validMaterialIds = materialIds?.filter(id => id && id.trim() !== '') || [];
 
     try {
       // Use transaction to create lesson and materials together
@@ -201,9 +204,9 @@ export class CoursesService {
           },
         });
 
-        // Create materials if materialIds are provided
-        if (materialIds && materialIds.length > 0) {
-          const materialPromises = materialIds.map(async (materialId) => {
+        // Create materials if valid materialIds are provided
+        if (validMaterialIds.length > 0) {
+          const materialPromises = validMaterialIds.map(async (materialId) => {
             // Get file details from Cloudflare
             try {
               const fileDetails = await this.cloudflareService.getFileDetails(materialId);
@@ -250,6 +253,26 @@ export class CoursesService {
       data: {
         ...data,
         courseId
+      },
+    });
+  }
+
+  async addMaterialToLesson(lessonId: string, data: Omit<Prisma.MaterialUncheckedCreateInput, 'lessonId' | 'courseId'>) {
+    // First get the lesson to get the courseId
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { id: true, courseId: true }
+    });
+
+    if (!lesson) {
+      throw new NotFoundException(`Lesson with ID ${lessonId} not found`);
+    }
+
+    return this.prisma.material.create({
+      data: {
+        ...data,
+        courseId: lesson.courseId,
+        lessonId: lessonId
       },
     });
   }
@@ -413,6 +436,22 @@ export class CoursesService {
 
     return this.prisma.material.findMany({
       where: { courseId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async getMaterialsByLessonId(lessonId: string) {
+    // First check if lesson exists
+    const lesson = await this.prisma.lesson.findUnique({
+      where: { id: lessonId },
+    });
+
+    if (!lesson) {
+      throw new NotFoundException(`Lesson with ID ${lessonId} not found`);
+    }
+
+    return this.prisma.material.findMany({
+      where: { lessonId },
       orderBy: { createdAt: 'asc' },
     });
   }
