@@ -77,6 +77,13 @@ export class CoursesService {
             data: {
               price: pricingData.price,
               country: pricingData.country,
+              currency: pricingData.currency || 'USD', // Default to USD if not provided
+              region: pricingData.region || '',
+              isActive: pricingData.isActive !== undefined ? pricingData.isActive : true, // Default to true if not provided
+              pricingTier: pricingData.pricingTier || 'STANDARD', // Default to STANDARD if not provided
+              discount: pricingData.discount || 0, // Default to 0 if not provided
+              validFrom: pricingData.validFrom || new Date(),
+              validTo: pricingData.validTo || null, // Allow null for no expiration
             },
           });
 

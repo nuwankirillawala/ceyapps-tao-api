@@ -59,7 +59,7 @@ model Pricing {
   id             String          @id @default(uuid())
   price          Float
   country        String
-  currency       String          @default("USD")
+  currency       String?          @default("USD")
   region         String?
   isActive       Boolean         @default(true)
   validFrom      DateTime        @default(now())

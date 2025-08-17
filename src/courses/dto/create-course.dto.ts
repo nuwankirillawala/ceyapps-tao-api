@@ -17,6 +17,79 @@ export class CreatePricingDto {
   })
   @IsString()
   country: string;
+
+  @ApiProperty({
+    description: 'Currency code (e.g., USD, EUR)',
+    example: 'USD',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  currency?: string;
+
+  @ApiProperty({
+    description: 'Region for pricing (optional)',
+    example: 'North America',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  region?: string;
+
+  @ApiProperty({
+    description: 'Is this pricing active?',
+    example: true,
+    required: false,
+    default: true,
+  })
+  @IsOptional()
+  isActive?: boolean = true;
+
+  @ApiProperty({
+    description: 'Pricing valid from date',
+    example: '2024-01-01T00:00:00.000Z',
+    required: false,
+  })
+  @IsOptional()
+  @Type(() => Date)
+  validFrom?: Date;
+
+  @ApiProperty({
+    description: 'Pricing valid to date',
+    example: '2024-12-31T23:59:59.000Z',
+    required: false,
+  })
+  @IsOptional()
+  @Type(() => Date)
+  validTo?: Date;
+
+  @ApiProperty({
+    description: 'Discount amount (optional)',
+    example: 10.0,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  discount?: number;
+
+  @ApiProperty({
+    description: 'Original price before discount (optional)',
+    example: 120.0,
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  originalPrice?: number;
+
+  @ApiProperty({
+    description: 'Pricing tier (optional)',
+    example: 'PREMIUM',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  pricingTier?: string;
+  
 }
 
 export class CreateCourseDto {
