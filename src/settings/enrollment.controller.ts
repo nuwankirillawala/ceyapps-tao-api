@@ -389,11 +389,19 @@ export class EnrollmentController {
       type: 'object',
       properties: {
         message: { type: 'string', example: 'Enrollment completed successfully' },
-        orderId: { type: 'string', example: 'order-uuid-123' },
-        courseId: { type: 'string', example: 'course-uuid-123' },
-        price: { type: 'number', example: 99.99 },
-        currency: { type: 'string', example: 'USD' },
-        stripePaymentIntentId: { type: 'string', example: 'pi_1234567890' }
+        data: {
+          type: 'object',
+          properties: {
+            id: {type: 'string', example: 'Enrollment Id'},
+            orderId: { type: 'string', example: 'order-uuid-123' },
+            courseId: { type: 'string', example: 'course-uuid-123' },
+            userId: {type: 'string', example: 'user-uuid-123'},
+            country: { type: 'string', example: 'US' },
+            status: { type: 'string', example: 'ACTIVE' },
+            enrolledAt: { type: 'string', example: '2024-01-15T10:30:00Z' },
+            lastAccessedAt: { type: 'string', example: '2024-01-15T10:30:00Z' },
+          }
+        }
       }
     }
   })
@@ -433,7 +441,8 @@ export class EnrollmentController {
       targetUserId = authenticatedUserId;
     }
 
-    return this.settingsService.enrollCourse(targetUserId, {
+    return this.settingsService.enrollCourse({
+      userId: targetUserId,
       courseId,
       country,
       paymentMethodId
@@ -471,7 +480,8 @@ export class EnrollmentController {
     // Additional validation for admin enrollment
     // Could include checking if the target user exists, etc.
 
-    return this.settingsService.enrollCourse(userId, {
+    return this.settingsService.enrollCourse({
+      userId,
       courseId,
       country,
       paymentMethodId

@@ -1392,8 +1392,8 @@ export class SettingsService {
 
   // ===== ENROLLMENT METHODS =====
 
-  async enrollCourse(userId: string, enrollCourseDto: EnrollCourseDto) {
-    const { courseId, country, paymentMethodId } = enrollCourseDto;
+  async enrollCourse(enrollCourseDto: EnrollCourseDto) {
+    const { courseId, country, paymentMethodId, userId } = enrollCourseDto;
 
     // Check if user is already enrolled
     const existingEnrollment = await this.prisma.userEnrollment.findUnique({
@@ -1457,11 +1457,16 @@ export class SettingsService {
 
     return {
       message: 'Enrollment completed successfully',
-      orderId: order.id,
-      courseId,
-      price,
-      currency: 'USD',
-      stripePaymentIntentId
+      data:{
+        id: order.id,
+        orderId: order.id,
+        courseId,
+        userId,
+        country,
+        status: 'ACTIVE',
+        enrolledAt: new Date(),
+        lastAccessedAt: new Date()
+      }
     };
   }
 
