@@ -1,5 +1,5 @@
 // src/prisma/prisma.service.ts
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, INestApplication, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { databaseConfig } from '../config/database.config';
 
@@ -21,6 +21,14 @@ export class PrismaService
       // Fix connection pooling issues
       log: databaseConfig.enableQueryLogging ? ['query', 'warn', 'error'] : ['warn', 'error'],
       errorFormat: 'pretty',
+      // Supabase connection pooling optimizations
+      ...(databaseConfig.supabase.isPoolerMode && {
+        __internal: {
+          engine: {
+            enableEngineDebugMode: false,
+          },
+        },
+      }),
     });
   }
 

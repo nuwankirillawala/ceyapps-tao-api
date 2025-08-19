@@ -54,3 +54,26 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Test files and documentation (moved to separate folders)
+/test-files/
+/docs/
+*.test.js
+*.test.ts
+test-*.js
+test-*.ts
+test-*.md
+test-*.txt
+
+# Sensitive data files
+*cloudflare*
+*r2*
+*aws*
+*secret*
+*key*
+*token*
+*credential*
+
+# Environment files
+.env*
+!.env.example

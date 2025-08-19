@@ -18,6 +18,13 @@ export const databaseConfig = {
     statementTimeout: parseInt(process.env.DATABASE_STATEMENT_TIMEOUT || '30000'),
   },
   
+  // Supabase specific settings
+  supabase: {
+    isPoolerMode: process.env.SUPABASE_POOL_MODE === 'true',
+    connectionLimit: parseInt(process.env.SUPABASE_CONNECTION_LIMIT || '10'),
+    idleTimeout: parseInt(process.env.SUPABASE_IDLE_TIMEOUT || '30000'),
+  },
+  
   // Logging
   enableQueryLogging: process.env.ENABLE_QUERY_LOGGING === 'true',
   enableErrorLogging: process.env.ENABLE_ERROR_LOGGING !== 'false',
