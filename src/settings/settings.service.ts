@@ -1894,6 +1894,28 @@ export class SettingsService {
       throw new BadRequestException('Course already has this pricing');
     }
 
+    // Check if course already has pricing for the same country and region
+    const existingCountryPricing = await this.prisma.coursePricing.findFirst({
+      where: {
+        courseId,
+        isActive: true,
+        pricing: {
+          country: pricing.country,
+          region: pricing.region
+        }
+      },
+      include: {
+        pricing: true
+      }
+    });
+
+    if (existingCountryPricing) {
+      throw new BadRequestException(
+        `Course already has pricing for country: ${pricing.country}${pricing.region ? `, region: ${pricing.region}` : ''}. ` +
+        `Existing price: ${existingCountryPricing.pricing.currency || 'USD'} ${existingCountryPricing.pricing.price}`
+      );
+    }
+
     const coursePricing = await this.prisma.coursePricing.create({
       data: createCoursePricingDto,
       include: {
@@ -1944,13 +1966,88 @@ export class SettingsService {
     });
   }
 
+  async checkCoursePricingConflict(courseId: string, country: string, region?: string) {
+    const existingPricing = await this.prisma.coursePricing.findFirst({
+      where: {
+        courseId,
+        isActive: true,
+        pricing: {
+          country,
+          region: region || null
+        }
+      },
+      include: {
+        pricing: true
+      }
+    });
+
+    return existingPricing;
+  }
+
+  async getAvailablePricingLocations() {
+    const locations = await this.prisma.pricing.groupBy({
+      by: ['country', 'region'],
+      where: {
+        isActive: true
+      },
+      _count: {
+        country: true
+      }
+    });
+
+    const result = locations.map(location => ({
+      country: location.country,
+      region: location.region,
+      courseCount: location._count.country
+    }));
+
+    return result;
+  }
+
   async updateCoursePricing(id: string, updateCoursePricingDto: UpdateCoursePricingDto) {
     const coursePricing = await this.prisma.coursePricing.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        pricing: true
+      }
     });
 
     if (!coursePricing) {
       throw new NotFoundException('Pricing not found');
+    }
+
+    // If pricingId is being updated, check for conflicts
+    if (updateCoursePricingDto.pricingId && updateCoursePricingDto.pricingId !== coursePricing.pricingId) {
+      const newPricing = await this.prisma.pricing.findUnique({
+        where: { id: updateCoursePricingDto.pricingId }
+      });
+
+      if (!newPricing) {
+        throw new NotFoundException('New pricing not found');
+      }
+
+      // Check if course already has pricing for the same country and region
+      const existingCountryPricing = await this.prisma.coursePricing.findFirst({
+        where: {
+          courseId: coursePricing.courseId,
+          id: { not: id }, // Exclude current record
+          isActive: true,
+          pricing: {
+            country: newPricing.country,
+            region: newPricing.region
+          }
+        },
+        include: {
+          pricing: true
+        }
+      });
+
+      if (existingCountryPricing) {
+        throw new BadRequestException(
+          `Course already has pricing for country: ${newPricing.country}${newPricing.region ? `, region: ${newPricing.region}` : ''}. ` +
+          `Existing price: ${existingCountryPricing.pricing.currency || 'USD'} ${existingCountryPricing.pricing.price}`
+        );
+      }
     }
 
     const updatedCoursePricing = await this.prisma.coursePricing.update({

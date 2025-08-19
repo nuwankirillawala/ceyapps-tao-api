@@ -195,6 +195,76 @@ export class PricingController {
     return this.settingsService.getCoursePricing(courseId, country, region);
   }
 
+  @Get('course/:courseId/check-conflict')
+  @ApiOperation({ summary: 'Check for pricing conflicts before creating course pricing' })
+  @ApiParam({ name: 'courseId', description: 'Course ID' })
+  @ApiQuery({ name: 'country', required: true, description: 'Country to check' })
+  @ApiQuery({ name: 'region', required: false, description: 'Region to check' })
+  @ApiResponse({
+    status: 200,
+    description: 'Conflict check completed',
+    schema: {
+      type: 'object',
+      properties: {
+        hasConflict: { type: 'boolean' },
+        existingPricing: { type: 'object', nullable: true },
+        message: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Course not found',
+  })
+  async checkPricingConflict(
+    @Param('courseId') courseId: string,
+    @Query('country') country: string,
+    @Query('region') region?: string,
+  ) {
+    const existingPricing = await this.settingsService.checkCoursePricingConflict(courseId, country, region);
+    
+    if (existingPricing) {
+      return {
+        hasConflict: true,
+        existingPricing: {
+          id: existingPricing.id,
+          price: existingPricing.pricing.price,
+          currency: existingPricing.pricing.currency,
+          country: existingPricing.pricing.country,
+          region: existingPricing.pricing.region
+        },
+        message: `Course already has pricing for ${country}${region ? `, ${region}` : ''}: ${existingPricing.pricing.currency || 'USD'} ${existingPricing.pricing.price}`
+      };
+    }
+
+    return {
+      hasConflict: false,
+      existingPricing: null,
+      message: `No pricing conflict found for ${country}${region ? `, ${region}` : ''}`
+    };
+  }
+
+  @Get('locations/available')
+  @ApiOperation({ summary: 'Get all available pricing locations (countries and regions)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Available pricing locations retrieved successfully',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          country: { type: 'string' },
+          region: { type: 'string', nullable: true },
+          courseCount: { type: 'number' }
+        }
+      }
+    }
+  })
+  async getAvailablePricingLocations() {
+    return this.settingsService.getAvailablePricingLocations();
+  }
+
   @Put('course/:id')
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Update course pricing' })

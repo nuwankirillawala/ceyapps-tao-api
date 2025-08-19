@@ -72,6 +72,7 @@ model Pricing {
   coursePricings CoursePricing[]
 
   @@unique([country, region])
+  @@index([country])
 }
 
 model CoursePricing {
