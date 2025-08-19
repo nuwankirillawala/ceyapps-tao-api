@@ -1,6 +1,7 @@
 // src/prisma/prisma.service.ts
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { databaseConfig } from '../config/database.config';
 
 @Injectable()
 export class PrismaService
@@ -18,7 +19,7 @@ export class PrismaService
         },
       },
       // Fix connection pooling issues
-      log: ['warn', 'error'],
+      log: databaseConfig.enableQueryLogging ? ['query', 'warn', 'error'] : ['warn', 'error'],
       errorFormat: 'pretty',
     });
   }
@@ -60,6 +61,52 @@ export class PrismaService
       this.isConnected = false;
       throw error;
     }
+  }
+
+  // Handle prepared statement errors specifically
+  async handlePreparedStatementError() {
+    try {
+      this.logger.log('Handling prepared statement error...');
+      // Force a new connection to clear prepared statements
+      await this.$disconnect();
+      await this.$connect();
+      this.isConnected = true;
+      this.logger.log('Successfully reconnected after prepared statement error');
+    } catch (error) {
+      this.logger.error('Failed to handle prepared statement error:', error.message);
+      this.isConnected = false;
+      throw error;
+    }
+  }
+
+  // Execute query with retry logic for prepared statement errors
+  async executeWithRetry<T>(operation: () => Promise<T>): Promise<T> {
+    const maxRetries = 3;
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+        
+        // Check if it's a prepared statement error
+        if (error?.code === '42P05' || 
+            (error?.message && error.message.includes('prepared statement'))) {
+          this.logger.warn(`Prepared statement error on attempt ${attempt}, retrying...`);
+          
+          if (attempt < maxRetries) {
+            await this.handlePreparedStatementError();
+            continue;
+          }
+        }
+        
+        // If it's not a prepared statement error or we've exhausted retries, throw
+        throw error;
+      }
+    }
+    
+    throw lastError;
   }
 
   // Check connection status
