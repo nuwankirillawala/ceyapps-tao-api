@@ -72,8 +72,8 @@ model Pricing {
   updatedAt      DateTime        @default(now())
   coursePricings CoursePricing[]
 
-  @@unique([country, region])
   @@index([country])
+  @@index([country, region])
 }
 
 model CoursePricing {
