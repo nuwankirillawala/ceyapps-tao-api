@@ -751,6 +751,9 @@ export class SettingsService {
               instructorName: true,
               level: true,
               category: true,
+              demoVideoThumbnail: true,
+              demoVideoDuration: true,
+              courseDuration: true,
             },
           },
         },
@@ -940,6 +943,17 @@ export class SettingsService {
             instructorName: true,
             level: true,
             category: true,
+            demoVideoThumbnail: true,
+            demoVideoDuration: true,
+            courseDuration: true,
+            lessons: {
+              select: {
+                id: true,
+                title: true,
+                courseId: true,
+                content: true
+              },
+            },
           },
         },
       },
