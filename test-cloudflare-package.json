@@ -1,0 +1,17 @@
+{
+  "name": "cloudflare-r2-test",
+  "version": "1.0.0",
+  "description": "Test script for Cloudflare R2 upload functionality",
+  "main": "test-cloudflare-r2.js",
+  "scripts": {
+    "test": "node test-cloudflare-r2.js",
+    "install-deps": "npm install node-fetch@2 form-data"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7",
+    "form-data": "^4.0.0"
+  },
+  "keywords": ["cloudflare", "r2", "upload", "test"],
+  "author": "Tao Backend Team",
+  "license": "MIT"
+}
