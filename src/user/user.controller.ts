@@ -37,7 +37,7 @@ export class UserController {
     }
   })
   getMe(@Req() req) {
-    return req.user;
+    return this.userService.findByEmail(req.user.email);
   }
 
   @Get('admin-only')
