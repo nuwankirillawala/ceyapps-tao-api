@@ -10,10 +10,9 @@ import { PricingController } from './pricing.controller';
 import { SettingsService } from './settings.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CloudflareModule } from '../cloudflare/cloudflare.module';
-import { StripeModule } from '../stripe/stripe.module';
 
 @Module({
-  imports: [PrismaModule, CloudflareModule, StripeModule],
+  imports: [PrismaModule, CloudflareModule],
   controllers: [
     SettingsController, 
     AdminSettingsController, 

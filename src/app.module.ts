@@ -11,6 +11,8 @@ import { RolesModule } from './roles/roles.module';
 import { CloudflareModule } from './cloudflare/cloudflare.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { SettingsModule } from './settings/settings.module';
+import { SubscriptionPlansModule } from './subscription-plans/subscription-plans.module';
+
 import { PrismaInterceptor } from './prisma/prisma.interceptor';
 
 @Module({
@@ -26,6 +28,8 @@ import { PrismaInterceptor } from './prisma/prisma.interceptor';
     CloudflareModule,
     AnnouncementsModule,
     SettingsModule,
+    SubscriptionPlansModule,
+
   ],
   controllers: [AppController],
   providers: [

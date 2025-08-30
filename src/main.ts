@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as dotenv from 'dotenv';
+import * as express from 'express';
 
 dotenv.config();
 
@@ -9,6 +10,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   console.log(process.env.ALLOWED_ORIGINS?.split(','))
+  
+  // Add raw body parser for Stripe webhooks BEFORE other middleware
+  app.use('/subscription-plans/webhook', express.raw({ type: 'application/json' }));
+  
   // CORS configuration for Render deployment
   app.enableCors({
     origin: '*',
