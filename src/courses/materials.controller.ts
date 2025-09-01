@@ -39,6 +39,32 @@ export class MaterialsController {
     return this.coursesService.getMaterialsByLessonId(lessonId);
   }
 
+  @Get('course/:courseId')
+  @ApiOperation({ summary: 'Get materials by course ID' })
+  @ApiParam({ name: 'courseId', description: 'Course ID', example: 'course-uuid-123' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Materials retrieved successfully',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: 'material-uuid-123' },
+          title: { type: 'string', example: 'HTML Cheat Sheet' },
+          fileUrl: { type: 'string', example: 'https://example.com/cheatsheet.pdf' },
+          courseId: { type: 'string', example: 'course-uuid-123' },
+          lessonId: { type: 'string', example: 'lesson-uuid-123' },
+          createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
+          updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' }
+        }
+      }
+    }
+  })
+  async getMaterialsByCourseId(@Param('courseId') courseId: string) {
+    return this.coursesService.getMaterialsByCourseId(courseId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get material by ID' })
   @ApiParam({ name: 'id', description: 'Material ID', example: 'material-uuid-123' })
