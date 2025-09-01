@@ -11,6 +11,18 @@ export class AnnouncementsService {
   async createAnnouncement(createAnnouncementDto: CreateAnnouncementDto, userId: string) {
     const { type, courseId, targetRoles, targetUserIds, ...data } = createAnnouncementDto;
 
+    console.log('Creating announcement with userId:', userId);
+
+    // Validate that the user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      console.error(`User with ID ${userId} not found in database`);
+      throw new BadRequestException(`User with ID ${userId} not found`);
+    }
+
     // Validate based on announcement type
     this.validateAnnouncementData(type, courseId, targetRoles, targetUserIds);
 
@@ -61,6 +73,15 @@ export class AnnouncementsService {
 
   async createPublicAnnouncement(createPublicAnnouncementDto: CreatePublicAnnouncementDto, userId: string) {
     const { ...data } = createPublicAnnouncementDto;
+
+    // Validate that the user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new BadRequestException(`User with ID ${userId} not found`);
+    }
 
     return this.prisma.announcement.create({
       data: {

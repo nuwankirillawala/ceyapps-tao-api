@@ -102,7 +102,7 @@ export class CreateAnnouncementDto {
   })
   @IsOptional()
   @IsDateString()
-  startsAt?: string;
+  startsAt?: Date;
 
   @ApiPropertyOptional({
     description: 'Action URL for clickable announcements',

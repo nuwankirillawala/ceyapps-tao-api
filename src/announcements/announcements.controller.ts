@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req, Patch, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Req, Patch, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { AnnouncementsService } from './announcements.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -41,6 +41,13 @@ export class AnnouncementsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions' })
   async createAnnouncement(@Body() createAnnouncementDto: CreateAnnouncementDto, @Req() req) {
+    console.log('Request user object:', req.user);
+    console.log('User ID from request:', req.user?.userId);
+    
+    if (!req.user || !req.user.userId) {
+      throw new BadRequestException('User authentication required');
+    }
+    
     return this.announcementsService.createAnnouncement(createAnnouncementDto, req.user.userId);
   }
 
@@ -72,10 +79,15 @@ export class AnnouncementsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions' })
   async createPublicAnnouncement(@Body() createPublicAnnouncementDto: CreatePublicAnnouncementDto, @Req() req) {
+    if (!req.user || !req.user.userId) {
+      throw new BadRequestException('User authentication required');
+    }
+    
     return this.announcementsService.createPublicAnnouncement(createPublicAnnouncementDto, req.user.userId);
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ 
     summary: 'Get all announcements (Admin) or user-specific announcements (Users)',
     description: 'Retrieve announcements with optional filters. Admins can see all announcements with filters, users see their relevant announcements, and public users see only public announcements.'
