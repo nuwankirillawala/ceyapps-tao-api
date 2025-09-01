@@ -1895,12 +1895,10 @@ export class SettingsService {
     }
 
     // Check if course already has this pricing
-    const existingCoursePricing = await this.prisma.coursePricing.findUnique({
+    const existingCoursePricing = await this.prisma.coursePricing.findFirst({
       where: {
-        courseId_pricingId: {
-          courseId,
-          pricingId
-        }
+        courseId,
+        pricingId
       }
     });
 
