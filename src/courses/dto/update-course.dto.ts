@@ -42,6 +42,15 @@ export class UpdateCourseDto {
   instructorName?: string;
 
   @ApiProperty({
+    description: 'Course thumbnail URL (optional)',
+    example: 'https://example.com/thumbnail.jpg',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  thumbnail?: string;
+
+  @ApiProperty({
     description: 'Demo video ID from Cloudflare Stream',
     example: 'video-uuid-123',
     required: false,

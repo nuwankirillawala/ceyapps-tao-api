@@ -60,6 +60,7 @@ export class CoursesService {
           description: data.description,
           instructorId: data.instructorId,
           instructorName: data.instructorName,
+          thumbnail: data.thumbnail,
           demoVideoId: data.demoVideoId,
           demoVideoUrl,
           demoVideoThumbnail,

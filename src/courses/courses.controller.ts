@@ -31,6 +31,7 @@ export class CoursesController {
         description: { type: 'string', example: 'Learn the basics of web development' },
         instructorId: { type: 'string', example: 'a1c8add5-4cec-4d31-b9db-a1469cfc521d' },
         instructorName: { type: 'string', example: 'John Doe' },
+        thumbnail: { type: 'string', example: 'https://example.com/thumbnail.jpg' },
         createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
         updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' }
       }
@@ -69,6 +70,7 @@ export class CoursesController {
           description: { type: 'string', example: 'Learn the basics of web development' },
           instructorId: { type: 'string', example: 'a1c8add5-4cec-4d31-b9db-a1469cfc521d' },
           instructorName: { type: 'string', example: 'John Doe' },
+          thumbnail: { type: 'string', example: 'https://example.com/thumbnail.jpg' },
           createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
           updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' }
         }
@@ -93,6 +95,7 @@ export class CoursesController {
         description: { type: 'string', example: 'Learn the basics of web development' },
         instructorId: { type: 'string', example: 'a1c8add5-4cec-4d31-b9db-a1469cfc521d' },
         instructorName: { type: 'string', example: 'John Doe' },
+        thumbnail: { type: 'string', example: 'https://example.com/thumbnail.jpg' },
         lessons: { type: 'array', items: { type: 'object' } },
         materials: { type: 'array', items: { type: 'object' } },
         createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
@@ -219,7 +222,8 @@ export class CoursesController {
         title: { type: 'string', example: 'Advanced Web Development' },
         description: { type: 'string', example: 'Learn advanced web development techniques' },
         instructorId: { type: 'string', example: 'a1c8add5-4cec-4d31-b9db-a1469cfc521d' },
-        instructorName: { type: 'string', example: 'John Doe' }
+        instructorName: { type: 'string', example: 'John Doe' },
+        thumbnail: { type: 'string', example: 'https://example.com/thumbnail.jpg' }
       }
     }
   })
