@@ -10,6 +10,15 @@ export class CreateMaterialDto {
   title: string;
 
   @ApiProperty({
+    description: 'Material description (optional)',
+    example: 'A comprehensive cheat sheet covering HTML tags and attributes',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiProperty({
     description: 'Course ID that this material belongs to',
     example: 'course-uuid-123',
   })
