@@ -12,6 +12,7 @@ import { CloudflareModule } from './cloudflare/cloudflare.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { SettingsModule } from './settings/settings.module';
 import { SubscriptionPlansModule } from './subscription-plans/subscription-plans.module';
+import { ReportingModule } from './reporting/reporting.module';
 
 import { PrismaInterceptor } from './prisma/prisma.interceptor';
 
@@ -29,7 +30,7 @@ import { PrismaInterceptor } from './prisma/prisma.interceptor';
     AnnouncementsModule,
     SettingsModule,
     SubscriptionPlansModule,
-
+    ReportingModule,
   ],
   controllers: [AppController],
   providers: [

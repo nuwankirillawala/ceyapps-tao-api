@@ -10,10 +10,9 @@ WORKDIR /app
 # Copy package files first for better caching
 COPY package.json yarn.lock ./
 
-# Install dependencies with better network handling
-RUN yarn config set network-timeout 300000 && \
-    yarn install --frozen-lockfile --network-timeout 300000 || \
-    yarn install --network-timeout 300000
+# Use npm instead of yarn to avoid network issues
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm install --no-optional
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -29,7 +28,7 @@ COPY . .
 RUN npx prisma generate
 
 # Build the application
-RUN yarn build
+RUN npm run build
 
 # Production image, copy all the files and run the app
 FROM base AS runner
@@ -54,4 +53,4 @@ ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
 # Run the NestJS application
-CMD ["node", "dist/src/main"] 
+CMD ["node", "dist/src/main"]
