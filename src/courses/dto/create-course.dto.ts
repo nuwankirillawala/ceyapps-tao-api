@@ -137,6 +137,15 @@ export class CreateCourseDto {
   thumbnail?: string;
 
   @ApiProperty({
+    description: 'Course profile image URL (optional)',
+    example: 'https://example.com/profile-image.jpg',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  profileImage?: string;
+
+  @ApiProperty({
     description: 'Demo video ID from Cloudflare Stream (optional)',
     example: 'video-uuid-123',
     required: false,
