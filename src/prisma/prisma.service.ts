@@ -21,11 +21,30 @@ export class PrismaService
       // Fix connection pooling issues
       log: databaseConfig.enableQueryLogging ? ['query', 'warn', 'error'] : ['warn', 'error'],
       errorFormat: 'pretty',
+      // Connection pooling optimizations for production
+      ...(databaseConfig.postgresql.disablePreparedStatements && {
+        __internal: {
+          engine: {
+            enableEngineDebugMode: false,
+            disablePreparedStatements: true,
+          },
+        },
+      }),
       // Supabase connection pooling optimizations
       ...(databaseConfig.supabase.isPoolerMode && {
         __internal: {
           engine: {
             enableEngineDebugMode: false,
+            disablePreparedStatements: true,
+          },
+        },
+      }),
+      // Render-specific optimizations
+      ...(databaseConfig.render.disablePreparedStatements && {
+        __internal: {
+          engine: {
+            enableEngineDebugMode: false,
+            disablePreparedStatements: true,
           },
         },
       }),
@@ -98,12 +117,17 @@ export class PrismaService
       } catch (error: any) {
         lastError = error;
         
-        // Check if it's a prepared statement error
-        if (error?.code === '42P05' || 
-            (error?.message && error.message.includes('prepared statement'))) {
+        // Check if it's a prepared statement error (PostgreSQL error code 26000)
+        if (error?.code === '26000' || 
+            error?.code === '42P05' || 
+            (error?.message && error.message.includes('prepared statement')) ||
+            (error?.message && error.message.includes('does not exist'))) {
           this.logger.warn(`Prepared statement error on attempt ${attempt}, retrying...`);
           
           if (attempt < maxRetries) {
+            // Add exponential backoff
+            const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+            await new Promise(resolve => setTimeout(resolve, delay));
             await this.handlePreparedStatementError();
             continue;
           }

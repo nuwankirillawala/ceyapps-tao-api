@@ -9,6 +9,8 @@ datasource db {
   extensions = [uuid_ossp(map: "uuid-ossp", schema: "extensions")]
   // Connection pool settings for Supabase
   directUrl  = env("DIRECT_URL")
+  // Connection pool configuration for production stability
+  relationMode = "prisma"
 }
 
 model User {
@@ -49,7 +51,6 @@ model Course {
   courseDuration     String?
   level              Level            @default(BEGINNER)
   thumbnail          String?
-  profileImage       String?
   announcements      Announcement[]   @relation("CourseAnnouncements")
   cartItems          CartItem[]       @relation("CourseCart")
   instructor         User?            @relation("UserCourses", fields: [instructorId], references: [id])
