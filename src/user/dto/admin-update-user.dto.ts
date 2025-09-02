@@ -55,4 +55,13 @@ export class AdminUpdateUserDto {
   @MinLength(6)
   @IsOptional()
   password?: string;
+
+  @ApiProperty({
+    description: 'User profile image URL (optional)',
+    example: 'https://example.com/profile-image.jpg',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  profileImage?: string;
 } 

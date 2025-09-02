@@ -53,4 +53,13 @@ export class AdminCreateUserDto {
   @IsString()
   @MinLength(6)
   password: string;
+
+  @ApiProperty({
+    description: 'User profile image URL (optional)',
+    example: 'https://example.com/profile-image.jpg',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  profileImage?: string;
 } 

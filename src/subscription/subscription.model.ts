@@ -64,3 +64,31 @@ export enum PaymentStatus {
   REFUNDED = 'REFUNDED'
 }
 
+export interface SubscriptionPlanDetailsResponse {
+  hasActiveSubscription: boolean;
+  currentPlan: {
+    id: string;
+    name: string;
+    description: string | null;
+    price: number;
+    currency: string;
+    interval: string;
+    intervalCount: number;
+    features: string[];
+  } | null;
+  subscriptionDetails: {
+    id: string;
+    status: SubscriptionStatus;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    cancelAtPeriodEnd: boolean;
+    trialStart: string | null;
+    trialEnd: string | null;
+  } | null;
+  planFeatures: string[];
+  maxCourses: number;
+  subscriptionEndDate: string | null;
+  subscriptionId: string | null;
+  message: string;
+}
+

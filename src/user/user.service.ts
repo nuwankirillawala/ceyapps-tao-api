@@ -26,6 +26,8 @@ export class UserService {
 
   // ✅ Create a user by admin
   async createUserByAdmin(data: AdminCreateUserDto): Promise<UserWithoutPassword> {
+    console.log('Creating user with data:', data);
+    
     // Check if email already exists
     const existingUser = await this.findByEmail(data.email);
     if (existingUser) {
@@ -35,12 +37,16 @@ export class UserService {
     // Hash password
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
+    const userData = {
+      ...data,
+      password: hashedPassword,
+      role: data.role || Role.STUDENT,
+    };
+    
+    console.log('User data to be saved:', userData);
+
     const user = await this.prisma.user.create({
-      data: {
-        ...data,
-        password: hashedPassword,
-        role: data.role || Role.STUDENT,
-      },
+      data: userData,
       select: {
         id: true,
         email: true,
@@ -53,6 +59,7 @@ export class UserService {
       },
     });
 
+    console.log('User created successfully:', user);
     return user as UserWithoutPassword;
   }
 
@@ -77,6 +84,7 @@ export class UserService {
     if (data.email !== undefined) updateData.email = data.email;
     if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
     if (data.role !== undefined) updateData.role = data.role;
+    if (data.profileImage !== undefined) updateData.profileImage = data.profileImage;
     
     // Hash password if provided
     if (data.password) {

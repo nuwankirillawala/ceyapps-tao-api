@@ -5,7 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { 
   CreateSubscriptionDto, 
   UpdateSubscriptionDto,
-  PaymentStatus
+  PaymentStatus,
+  SubscriptionPlanDetailsResponse
 } from './subscription.model';
 import { UserSubscription, SubscriptionStatus, User } from '@prisma/client';
 
@@ -660,6 +661,114 @@ export class SubscriptionService {
       this.logger.error(`Error getting price ID for plan: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Get subscription plan details by user ID
+   */
+  async getSubscriptionPlanDetailsByUserId(userId: string): Promise<SubscriptionPlanDetailsResponse> {
+    try {
+      // Get user's active subscription
+      const userSubscription = await this.prisma.userSubscription.findFirst({
+        where: { 
+          userId,
+          status: { in: ['ACTIVE', 'TRIALING'] }
+        },
+        include: {
+          subscriptionPlan: true
+        }
+      });
+
+      // If no active subscription, return default status
+      if (!userSubscription) {
+        return {
+          hasActiveSubscription: false,
+          currentPlan: null,
+          subscriptionDetails: null,
+          planFeatures: [],
+          maxCourses: 0,
+          subscriptionEndDate: null,
+          subscriptionId: null,
+          message: 'No active subscription found'
+        };
+      }
+
+      // Extract plan features and calculate max courses
+      const planFeatures = userSubscription.subscriptionPlan.features || [];
+      const maxCourses = this.calculateMaxCourses(userSubscription.subscriptionPlan.features);
+
+      // Format the response
+      const subscriptionDetails = {
+        hasActiveSubscription: true,
+        currentPlan: {
+          id: userSubscription.subscriptionPlan.id,
+          name: userSubscription.subscriptionPlan.name,
+          description: userSubscription.subscriptionPlan.description,
+          price: userSubscription.subscriptionPlan.price,
+          currency: userSubscription.subscriptionPlan.currency,
+          interval: userSubscription.subscriptionPlan.interval,
+          intervalCount: userSubscription.subscriptionPlan.intervalCount,
+          features: userSubscription.subscriptionPlan.features
+        },
+        subscriptionDetails: {
+          id: userSubscription.id,
+          status: userSubscription.status as any,
+          currentPeriodStart: userSubscription.currentPeriodStart.toISOString(),
+          currentPeriodEnd: userSubscription.currentPeriodEnd.toISOString(),
+          cancelAtPeriodEnd: userSubscription.cancelAtPeriodEnd,
+          trialStart: userSubscription.trialStart?.toISOString() || null,
+          trialEnd: userSubscription.trialEnd?.toISOString() || null
+        },
+        planFeatures,
+        maxCourses,
+        subscriptionEndDate: userSubscription.currentPeriodEnd.toISOString(),
+        subscriptionId: userSubscription.id,
+        message: 'Active subscription found'
+      };
+
+      this.logger.log(`Subscription plan details retrieved for user: ${userId}`);
+      return subscriptionDetails;
+    } catch (error) {
+      this.logger.error(`Error getting subscription plan details for user ${userId}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate max courses based on plan features
+   */
+  private calculateMaxCourses(features: string[]): number {
+    if (!features || features.length === 0) {
+      return 0;
+    }
+
+    // Look for course limit in features
+    const courseLimitFeature = features.find(feature => 
+      feature.toLowerCase().includes('course') && 
+      (feature.toLowerCase().includes('limit') || feature.toLowerCase().includes('max'))
+    );
+
+    if (courseLimitFeature) {
+      // Extract number from feature string (e.g., "10 courses", "unlimited courses")
+      const match = courseLimitFeature.match(/(\d+)/);
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+      
+      // Check for unlimited
+      if (courseLimitFeature.toLowerCase().includes('unlimited')) {
+        return -1; // -1 represents unlimited
+      }
+    }
+
+    // Default based on plan features
+    if (features.includes('premium') || features.includes('pro')) {
+      return -1; // Unlimited for premium plans
+    } else if (features.includes('basic')) {
+      return 5; // 5 courses for basic plans
+    }
+
+    return 0; // Default to 0 if no specific limit found
   }
 }
 

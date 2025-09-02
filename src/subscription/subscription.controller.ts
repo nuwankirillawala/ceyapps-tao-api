@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { SubscriptionService } from './subscription.service';
-import { CreateSubscriptionDto, UpdateSubscriptionDto } from './subscription.model';
+import { CreateSubscriptionDto, UpdateSubscriptionDto, SubscriptionPlanDetailsResponse } from './subscription.model';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('subscriptions')
@@ -188,6 +188,121 @@ export class SubscriptionController {
     } catch (error) {
       throw new HttpException(
         `Failed to retrieve subscriptions: ${error.message}`,
+        HttpStatus.BAD_REQUEST
+      );
+    }
+  }
+
+  @Get('status')
+  @ApiOperation({ 
+    summary: 'Get current user subscription status',
+    description: 'Retrieves comprehensive subscription plan details for the authenticated user including plan features, limits, and subscription status'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Subscription status retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        hasActiveSubscription: { type: 'boolean' },
+        currentPlan: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            description: { type: 'string' },
+            price: { type: 'number' },
+            currency: { type: 'string' },
+            interval: { type: 'string' },
+            intervalCount: { type: 'number' },
+            features: { type: 'array', items: { type: 'string' } }
+          }
+        },
+        subscriptionDetails: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            status: { type: 'string' },
+            currentPeriodStart: { type: 'string' },
+            currentPeriodEnd: { type: 'string' },
+            cancelAtPeriodEnd: { type: 'boolean' },
+            trialStart: { type: 'string' },
+            trialEnd: { type: 'string' }
+          }
+        },
+        planFeatures: { type: 'array', items: { type: 'string' } },
+        maxCourses: { type: 'number' },
+        subscriptionEndDate: { type: 'string' },
+        subscriptionId: { type: 'string' },
+        message: { type: 'string' }
+      }
+    }
+  })
+  async getCurrentUserSubscriptionStatus(@Req() req: any): Promise<SubscriptionPlanDetailsResponse> {
+    try {
+      const userId = req.user.userId;
+      const subscriptionDetails = await this.subscriptionService.getSubscriptionPlanDetailsByUserId(userId);
+      return subscriptionDetails;
+    } catch (error) {
+      throw new HttpException(
+        `Failed to retrieve subscription status: ${error.message}`,
+        HttpStatus.BAD_REQUEST
+      );
+    }
+  }
+
+  @Get('user/:userId')
+  @ApiOperation({ 
+    summary: 'Get subscription plan details by user ID',
+    description: 'Retrieves comprehensive subscription plan details for a specific user by their ID. Useful for admin operations or user management.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Subscription plan details retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        hasActiveSubscription: { type: 'boolean' },
+        currentPlan: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            description: { type: 'string' },
+            price: { type: 'number' },
+            currency: { type: 'string' },
+            interval: { type: 'string' },
+            intervalCount: { type: 'number' },
+            features: { type: 'array', items: { type: 'string' } }
+          }
+        },
+        subscriptionDetails: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            status: { type: 'string' },
+            currentPeriodStart: { type: 'string' },
+            currentPeriodEnd: { type: 'string' },
+            cancelAtPeriodEnd: { type: 'boolean' },
+            trialStart: { type: 'string' },
+            trialEnd: { type: 'string' }
+          }
+        },
+        planFeatures: { type: 'array', items: { type: 'string' } },
+        maxCourses: { type: 'number' },
+        subscriptionEndDate: { type: 'string' },
+        subscriptionId: { type: 'string' },
+        message: { type: 'string' }
+      }
+    }
+  })
+  async getSubscriptionPlanDetailsByUserId(@Param('userId') userId: string): Promise<SubscriptionPlanDetailsResponse> {
+    try {
+      const subscriptionDetails = await this.subscriptionService.getSubscriptionPlanDetailsByUserId(userId);
+      return subscriptionDetails;
+    } catch (error) {
+      throw new HttpException(
+        `Failed to retrieve subscription plan details: ${error.message}`,
         HttpStatus.BAD_REQUEST
       );
     }

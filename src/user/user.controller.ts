@@ -200,6 +200,7 @@ export class UserController {
     }
   })
   async createUserByAdmin(@Body() adminCreateUserDto: AdminCreateUserDto) { 
+    console.log('Admin create user endpoint received data:', adminCreateUserDto);
     return this.userService.createUserByAdmin(adminCreateUserDto);
   }
 
