@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ReportingService } from './reporting.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -14,6 +14,10 @@ import {
   CourseAnalyticsDto,
   UserGrowthTrendDto,
   DashboardStatsDto,
+  SalesReportDto,
+  UserReportDto,
+  SalesReportResponseDto,
+  UserReportResponseDto,
 } from './dto/reporting.dto';
 
 @ApiTags('Reporting')
@@ -23,12 +27,38 @@ import {
 export class ReportingController {
   constructor(private readonly reportingService: ReportingService) {}
 
-  @Get('overall-users')
+  // New comprehensive report endpoints
+  @Post('sales-report')
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Get overall users count' })
+  @ApiOperation({ summary: 'Generate comprehensive sales report with date range' })
   @ApiResponse({
     status: 200,
-    description: 'Returns the total number of users in the system',
+    description: 'Sales report generated successfully',
+    type: SalesReportResponseDto,
+  })
+  async generateSalesReport(@Body() reportDto: SalesReportDto): Promise<SalesReportResponseDto> {
+    return this.reportingService.generateSalesReport(reportDto);
+  }
+
+  @Post('user-report')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Generate comprehensive user report with date range' })
+  @ApiResponse({
+    status: 200,
+    description: 'User report generated successfully',
+    type: UserReportResponseDto,
+  })
+  async generateUserReport(@Body() reportDto: UserReportDto): Promise<UserReportResponseDto> {
+    return this.reportingService.generateUserReport(reportDto);
+  }
+
+  // Existing endpoints (keeping for backward compatibility)
+  @Get('overall-users')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Get overall users statistics' })
+  @ApiResponse({
+    status: 200,
+    description: 'Overall users statistics retrieved successfully',
     type: OverallUsersDto,
   })
   async getOverallUsers(): Promise<OverallUsersDto> {
@@ -37,10 +67,10 @@ export class ReportingController {
 
   @Get('registration-stats')
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Get registration statistics for current month and today' })
+  @ApiOperation({ summary: 'Get registration statistics for current month' })
   @ApiResponse({
     status: 200,
-    description: 'Returns registration statistics including monthly count, today count, and percentage',
+    description: 'Registration statistics retrieved successfully',
     type: RegistrationStatsDto,
   })
   async getRegistrationStats(): Promise<RegistrationStatsDto> {
@@ -49,10 +79,10 @@ export class ReportingController {
 
   @Get('course-selling-stats')
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Get course selling statistics for current month and today' })
+  @ApiOperation({ summary: 'Get course selling statistics for current month' })
   @ApiResponse({
     status: 200,
-    description: 'Returns course selling statistics including monthly sales, today sales, and percentage',
+    description: 'Course selling statistics retrieved successfully',
     type: CourseSellingStatsDto,
   })
   async getCourseSellingStats(): Promise<CourseSellingStatsDto> {
@@ -64,7 +94,7 @@ export class ReportingController {
   @ApiOperation({ summary: 'Get total earnings from all sources' })
   @ApiResponse({
     status: 200,
-    description: 'Returns total earnings breakdown from subscriptions and course orders',
+    description: 'Total earnings retrieved successfully',
     type: TotalEarningsDto,
   })
   async getTotalEarnings(): Promise<TotalEarningsDto> {
@@ -73,10 +103,10 @@ export class ReportingController {
 
   @Get('registrations-per-month')
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Get registrations per month for the last 10 months' })
+  @ApiOperation({ summary: 'Get registrations per month for last 10 months' })
   @ApiResponse({
     status: 200,
-    description: 'Returns registration count for each of the last 10 months',
+    description: 'Monthly registrations retrieved successfully',
     type: [MonthlyRegistrationDto],
   })
   async getRegistrationsPerMonth(): Promise<MonthlyRegistrationDto[]> {
@@ -85,10 +115,10 @@ export class ReportingController {
 
   @Get('course-analytics')
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Get comprehensive course analytics' })
+  @ApiOperation({ summary: 'Get course analytics and insights' })
   @ApiResponse({
     status: 200,
-    description: 'Returns course analytics including top courses, category distribution, and enrollment metrics',
+    description: 'Course analytics retrieved successfully',
     type: CourseAnalyticsDto,
   })
   async getCourseAnalytics(): Promise<CourseAnalyticsDto> {
@@ -97,10 +127,10 @@ export class ReportingController {
 
   @Get('user-growth-trend')
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Get user growth trend for the last 12 months' })
+  @ApiOperation({ summary: 'Get user growth trend for last 12 months' })
   @ApiResponse({
     status: 200,
-    description: 'Returns user growth data including new users and cumulative users for each month',
+    description: 'User growth trend retrieved successfully',
     type: [UserGrowthTrendDto],
   })
   async getUserGrowthTrend(): Promise<UserGrowthTrendDto[]> {
@@ -112,7 +142,7 @@ export class ReportingController {
   @ApiOperation({ summary: 'Get comprehensive dashboard statistics' })
   @ApiResponse({
     status: 200,
-    description: 'Returns all reporting data in one comprehensive response',
+    description: 'Dashboard statistics retrieved successfully',
     type: DashboardStatsDto,
   })
   async getDashboardStats(): Promise<DashboardStatsDto> {
