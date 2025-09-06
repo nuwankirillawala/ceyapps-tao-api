@@ -151,6 +151,25 @@ export class UserController {
     return this.userService.resetPassword(resetPasswordDto.token, resetPasswordDto.newPassword);
   }
 
+  @Put('update-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update current user password' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Password updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Password updated successfully' }
+      }
+    }
+  })
+  async updatePassword(@Req() req, @Body() body: { newPassword: string }) {
+    await this.userService.updatePassword(req.user.userId, body.newPassword);
+    return { message: 'Password updated successfully' };
+  }
+
   // New admin endpoints
 
   @Get()

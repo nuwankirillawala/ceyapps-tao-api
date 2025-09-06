@@ -426,6 +426,7 @@ export class SubscriptionPlansController {
   }
 
   @Get('plans')
+  @Public()
   @ApiOperation({ summary: 'Get subscription plans' })
   @ApiResponse({ 
     status: 200, 

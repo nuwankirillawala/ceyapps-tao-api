@@ -240,22 +240,10 @@ export class AnnouncementsService {
 
     const userCourseIds = user.courses.map(course => course.id);
 
-    return this.prisma.announcement.findMany({
+    const announcements = this.prisma.announcement.findMany({
       where: {
         isActive: true,
         AND: [
-          {
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } },
-            ],
-          },
-          {
-            OR: [
-              { startsAt: null },
-              { startsAt: { lte: new Date() } },
-            ],
-          },
           {
             OR: [
               // ALL_USERS announcements
@@ -302,6 +290,8 @@ export class AnnouncementsService {
         { createdAt: 'desc' },
       ],
     });
+
+    return announcements;
   }
 
   async getAnnouncementsForPublic() {
