@@ -39,11 +39,6 @@ export class PrismaInterceptor implements NestInterceptor {
   private isPreparedStatementError(error: any): boolean {
     return error?.message?.includes('prepared statement') || 
            error?.message?.includes('does not exist') ||
-           error?.code === '26000' ||
-           error?.code === '42P05' ||
-           (error?.message && error.message.includes('s38')) ||
-           (error?.message && error.message.includes('s53')) ||
-           (error?.message && error.message.includes('s79')) ||
-           (error?.message && error.message.includes('s80'));
+           error?.code === '26000';
   }
 }

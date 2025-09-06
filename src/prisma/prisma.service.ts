@@ -21,26 +21,16 @@ export class PrismaService
       // Fix connection pooling issues
       log: databaseConfig.enableQueryLogging ? ['query', 'warn', 'error'] : ['warn', 'error'],
       errorFormat: 'pretty',
-      // Connection pooling optimizations for production
-      ...(databaseConfig.postgresql.disablePreparedStatements && {
-        __internal: {
-          engine: {
-            enableEngineDebugMode: false,
-            disablePreparedStatements: true,
-          },
-        },
-      }),
       // Supabase connection pooling optimizations
       ...(databaseConfig.supabase.isPoolerMode && {
         __internal: {
           engine: {
             enableEngineDebugMode: false,
-            disablePreparedStatements: true,
           },
         },
       }),
-      // Render-specific optimizations
-      ...(databaseConfig.render.disablePreparedStatements && {
+      // Disable prepared statements for Supabase pooler
+      ...(process.env.DATABASE_URL?.includes('pooler.supabase.com') && {
         __internal: {
           engine: {
             enableEngineDebugMode: false,

@@ -1,12 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAnnouncementDto, CreatePublicAnnouncementDto } from './dto/create-announcement.dto';
 import { UpdateAnnouncementDto } from './dto/update-announcement.dto';
 import { AnnouncementType, AnnouncementPriority, AnnouncementCategory, AnnouncementDisplayType } from './enums/announcement.enums';
+import { EmailService, EmailRecipient, AnnouncementEmailData } from '../email/email.service';
 
 @Injectable()
 export class AnnouncementsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(AnnouncementsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+  ) {}
 
   async createAnnouncement(createAnnouncementDto: CreateAnnouncementDto, userId: string) {
     const { type, courseId, targetRoles, targetUserIds, ...data } = createAnnouncementDto;
@@ -49,7 +55,7 @@ export class AnnouncementsService {
       }
     }
 
-    return this.prisma.announcement.create({
+    const announcement = await this.prisma.announcement.create({
       data: {
         ...data,
         type,
@@ -69,6 +75,13 @@ export class AnnouncementsService {
         },
       },
     });
+
+    // Handle email sending for immediate announcements
+    if (announcement.displayType === AnnouncementDisplayType.EMAIL && announcement.sendEmail) {
+      await this.handleEmailSending(announcement);
+    }
+
+    return announcement;
   }
 
   async createPublicAnnouncement(createPublicAnnouncementDto: CreatePublicAnnouncementDto, userId: string) {
@@ -740,5 +753,205 @@ export class AnnouncementsService {
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => (b.count as number) - (a.count as number))
       .slice(0, 10); // Top 10 tags
+  }
+
+  // Email handling methods
+  private async handleEmailSending(announcement: any) {
+    try {
+      this.logger.log(`Processing email announcement: ${announcement.title}`);
+
+      // Check if this is an immediate announcement (no start date) or scheduled for today
+      const currentDate = new Date();
+      const startOfDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+      const shouldSendNow = !announcement.startsAt || 
+        (announcement.startsAt >= startOfDay && announcement.startsAt < endOfDay);
+
+      if (shouldSendNow) {
+        await this.sendImmediateEmail(announcement);
+      } else {
+        this.logger.log(`Announcement "${announcement.title}" is scheduled for future date: ${announcement.startsAt}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error handling email sending for announcement ${announcement.title}:`, error);
+    }
+  }
+
+  private async sendImmediateEmail(announcement: any) {
+    try {
+      // Get recipients based on announcement type
+      const recipients = await this.getRecipientsForAnnouncement(announcement);
+      
+      if (recipients.length === 0) {
+        this.logger.warn(`No recipients found for announcement: ${announcement.title}`);
+        return;
+      }
+
+      // Prepare email data
+      const emailData: AnnouncementEmailData = {
+        id: announcement.id,
+        title: announcement.title,
+        content: announcement.content,
+        type: announcement.type,
+        priority: announcement.priority,
+        category: announcement.category,
+        actionUrl: announcement.actionUrl,
+        actionText: announcement.actionText,
+        imageUrl: announcement.imageUrl,
+        createdAt: announcement.createdAt,
+        creator: {
+          name: announcement.creator.name,
+          email: announcement.creator.email,
+        },
+      };
+
+      // Send emails
+      await this.emailService.sendAnnouncementEmail(recipients, emailData);
+      
+      this.logger.log(`Successfully sent immediate announcement "${announcement.title}" to ${recipients.length} recipients`);
+    } catch (error) {
+      this.logger.error(`Error sending immediate email for announcement ${announcement.title}:`, error);
+    }
+  }
+
+  private async getRecipientsForAnnouncement(announcement: any): Promise<EmailRecipient[]> {
+    const recipients: EmailRecipient[] = [];
+
+    switch (announcement.type) {
+      case AnnouncementType.ALL_USERS:
+        recipients.push(...await this.getAllUsers());
+        break;
+
+      case AnnouncementType.REGISTERED_USERS:
+        recipients.push(...await this.getRegisteredUsers());
+        break;
+
+      case AnnouncementType.INSTRUCTORS:
+        recipients.push(...await this.getInstructors());
+        break;
+
+      case AnnouncementType.COURSE_STUDENTS:
+        if (announcement.courseId) {
+          recipients.push(...await this.getCourseStudents(announcement.courseId));
+        }
+        break;
+
+      case AnnouncementType.SPECIFIC_ROLES:
+        if (announcement.targetRoles && announcement.targetRoles.length > 0) {
+          recipients.push(...await this.getUsersByRoles(announcement.targetRoles));
+        }
+        break;
+
+      case AnnouncementType.SPECIFIC_USERS:
+        if (announcement.targetUserIds && announcement.targetUserIds.length > 0) {
+          recipients.push(...await this.getSpecificUsers(announcement.targetUserIds));
+        }
+        break;
+
+      case AnnouncementType.PROMOTIONAL:
+        recipients.push(...await this.getRegisteredUsers());
+        break;
+
+      case AnnouncementType.SYSTEM_UPDATE:
+        recipients.push(...await this.getRegisteredUsers());
+        break;
+
+      default:
+        this.logger.warn(`Unknown announcement type: ${announcement.type}`);
+    }
+
+    return recipients;
+  }
+
+  private async getAllUsers(): Promise<EmailRecipient[]> {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    });
+
+    return users.filter(user => user.email && user.name);
+  }
+
+  private async getRegisteredUsers(): Promise<EmailRecipient[]> {
+    const users = await this.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    });
+
+    return users.filter(user => user.email && user.name);
+  }
+
+  private async getInstructors(): Promise<EmailRecipient[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: 'INSTRUCTOR',
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    });
+
+    return users.filter(user => user.email && user.name);
+  }
+
+  private async getCourseStudents(courseId: string): Promise<EmailRecipient[]> {
+    const enrollments = await this.prisma.userEnrollment.findMany({
+      where: {
+        courseId: courseId,
+        status: 'ENROLLED',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return enrollments
+      .map(enrollment => enrollment.user)
+      .filter(user => user.email && user.name);
+  }
+
+  private async getUsersByRoles(roles: string[]): Promise<EmailRecipient[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        role: { in: roles as any },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    });
+
+    return users.filter(user => user.email && user.name);
+  }
+
+  private async getSpecificUsers(userIds: string[]): Promise<EmailRecipient[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: { in: userIds },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+    });
+
+    return users.filter(user => user.email && user.name);
   }
 } 
