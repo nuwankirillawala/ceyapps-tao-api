@@ -346,4 +346,19 @@ export class UserService {
 
     return updatedUser as UserWithoutPassword;
   }
+
+  // 🌍 Update user region information
+  async updateUserRegion(userId: string, regionData: {
+    country?: string;
+    region?: string;
+    city?: string;
+    timezone?: string;
+    lastLoginAt?: Date;
+    lastLoginIp?: string;
+  }): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: regionData,
+    });
+  }
 }

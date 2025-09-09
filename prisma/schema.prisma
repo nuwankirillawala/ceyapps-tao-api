@@ -6,10 +6,6 @@ generator client {
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
-  extensions = [uuid_ossp(map: "uuid-ossp", schema: "extensions")]
-  // Connection pool settings for Supabase
-  directUrl  = env("DIRECT_URL")
-  // Connection pool configuration for production stability
   relationMode = "prisma"
 }
 
@@ -23,6 +19,12 @@ model User {
   updatedAt         DateTime           @updatedAt
   phoneNumber       String?
   profileImage      String?
+  country           String?
+  region            String?
+  city              String?
+  timezone          String?
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
   announcements     Announcement[]     @relation("UserAnnouncements")
   cart              Cart?              @relation("UserCart")
   courses           Course[]           @relation("UserCourses")

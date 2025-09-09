@@ -180,3 +180,5 @@ If you encounter issues:
 3. Test with Stripe CLI to isolate issues
 4. Check environment variable configuration
 5. Review this guide for common solutions
+
+

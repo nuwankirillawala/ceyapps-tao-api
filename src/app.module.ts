@@ -16,6 +16,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { SettingsModule } from './settings/settings.module';
 import { SubscriptionPlansModule } from './subscription-plans/subscription-plans.module';
 import { ReportingModule } from './reporting/reporting.module';
+import { RegionModule } from './region/region.module';
 
 import { PrismaInterceptor } from './prisma/prisma.interceptor';
 
@@ -37,6 +38,7 @@ import { PrismaInterceptor } from './prisma/prisma.interceptor';
     SettingsModule,
     SubscriptionPlansModule,
     ReportingModule,
+    RegionModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,5 +1,5 @@
 // src/auth/auth.controller.ts
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -42,8 +42,8 @@ export class AuthController {
     }
   })
   @ApiResponse({ status: 401, description: 'Invalid email or password' })
-  async login(@Body() loginDto: LoginDto) {
+  async login(@Body() loginDto: LoginDto, @Req() req: any) {
     const { email, password } = loginDto;
-    return this.authService.login(email, password);
+    return this.authService.login(email, password, req);
   }
 }
