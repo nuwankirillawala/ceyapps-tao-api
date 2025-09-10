@@ -6,6 +6,10 @@ echo "🚀 Starting Tao Backend build process..."
 echo "📦 Installing dependencies..."
 yarn install --frozen-lockfile || yarn install
 
+# Run database migrations
+echo "🗄️ Running database migrations..."
+npx prisma migrate deploy
+
 # Generate Prisma client
 echo "🔧 Generating Prisma client..."
 npx prisma generate
