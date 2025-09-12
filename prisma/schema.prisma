@@ -35,6 +35,7 @@ model User {
   enrollments       UserEnrollment[]   @relation("UserEnrollments")
   userSubscriptions UserSubscription[] @relation("UserSubscriptions")
   wishlist          Wishlist[]         @relation("UserWishlist")
+  reviews           CourseReview[]     @relation("UserReviews")
 }
 
 model Course {
@@ -64,6 +65,25 @@ model Course {
   trendingCourses    TrendingCourse?  @relation("TrendingCourses")
   enrollments        UserEnrollment[] @relation("CourseEnrollments")
   wishlist           Wishlist[]       @relation("CourseWishlist")
+  reviews            CourseReview[]   @relation("CourseReviews")
+}
+
+model CourseReview {
+  id        String   @id @default(uuid())
+  courseId  String
+  userId    String
+  rating    Int      // 1-5 stars
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  course    Course   @relation("CourseReviews", fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserReviews", fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, userId]) // One review per user per course
+  @@index([courseId])
+  @@index([userId])
 }
 
 model Pricing {
