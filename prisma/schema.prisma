@@ -4,9 +4,10 @@ generator client {
 }
 
 datasource db {
-  provider   = "postgresql"
-  url        = env("DATABASE_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
   relationMode = "prisma"
+  extensions   = [uuid_ossp(map: "uuid-ossp", schema: "extensions")]
 }
 
 model User {
@@ -19,12 +20,12 @@ model User {
   updatedAt         DateTime           @updatedAt
   phoneNumber       String?
   profileImage      String?
-  country           String?
-  region            String?
   city              String?
-  timezone          String?
+  country           String?
   lastLoginAt       DateTime?
   lastLoginIp       String?
+  region            String?
+  timezone          String?
   announcements     Announcement[]     @relation("UserAnnouncements")
   cart              Cart?              @relation("UserCart")
   courses           Course[]           @relation("UserCourses")

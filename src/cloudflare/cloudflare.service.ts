@@ -465,13 +465,15 @@ export class CloudflareService {
     
     console.log('Authorization Header:', authorizationHeader);
     
+    // Extract host from the endpoint URL
+    const url = new URL(uploadUrl);
     const response = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': file.mimetype,
         'x-amz-content-sha256': payloadHash,
         'x-amz-date': amzDate,
-        'Host': `${this.accountId}.r2.cloudflarestorage.com`,
+        'Host': url.host,
         'Authorization': authorizationHeader
       },
       body: fileBuffer,
@@ -625,10 +627,12 @@ export class CloudflareService {
     try {
       // Try S3-compatible delete first
       const deleteUrl = `${this.r2Endpoint}/${this.r2BucketName}/${fileId}`;
+      // Extract host from the endpoint URL
+      const url = new URL(deleteUrl);
       const response = await fetch(deleteUrl, {
         method: 'DELETE',
         headers: {
-          'Host': `${this.accountId}.r2.cloudflarestorage.com`
+          'Host': url.host
         },
       });
 
@@ -675,18 +679,29 @@ export class CloudflareService {
       throw new BadRequestException('R2 not configured');
     }
 
+    console.log('Getting file details for:', fileId);
+
     try {
       // Try S3-compatible HEAD request first
-      const fileUrl = `${this.r2Endpoint}/${this.r2BucketName}/${fileId}`;
+      // Properly encode the fileId for the URL
+      const encodedFileId = encodeURIComponent(fileId);
+      const fileUrl = `${this.r2Endpoint}/${this.r2BucketName}/${encodedFileId}`;
+      
+      console.log('S3-compatible HEAD request URL:', fileUrl);
+      
+      // Extract host from the endpoint URL
+      const url = new URL(fileUrl);
       const response = await fetch(fileUrl, {
         method: 'HEAD',
         headers: {
-          'Host': `${this.accountId}.r2.cloudflarestorage.com`
+          'Host': url.host
         },
       });
 
+      console.log('S3-compatible HEAD response status:', response.status);
+
       if (response.ok) {
-        const publicFileUrl = `${this.r2Endpoint}/${this.r2BucketName}/${fileId}`;
+        const publicFileUrl = `${this.r2Endpoint}/${this.r2BucketName}/${encodedFileId}`;
         return {
           id: fileId,
           url: publicFileUrl,
@@ -695,13 +710,20 @@ export class CloudflareService {
           uploaded: response.headers.get('last-modified') || new Date().toISOString(),
           metadata: {},
         };
+      } else {
+        console.log('S3-compatible HEAD failed with status:', response.status);
+        const errorText = await response.text();
+        console.log('S3-compatible HEAD error:', errorText);
       }
     } catch (error) {
-      console.log('S3-compatible HEAD failed, trying R2 API...');
+      console.log('S3-compatible HEAD failed with error:', error.message);
     }
 
     // Fallback to R2 API
+    console.log('Trying R2 API fallback...');
     const fileUrl = `https://api.cloudflare.com/client/v4/accounts/${this.accountId}/storage/buckets/${this.r2BucketName}/objects/${encodeURIComponent(fileId)}`;
+    console.log('R2 API request URL:', fileUrl);
+    
     const response = await fetch(fileUrl, {
       method: 'GET',
       headers: {
@@ -709,14 +731,19 @@ export class CloudflareService {
       },
     });
 
+    console.log('R2 API response status:', response.status);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('R2 API error:', errorText);
       throw new BadRequestException(`Failed to get file details: ${response.statusText}`);
     }
 
     const result = await response.json();
+    console.log('R2 API result:', result);
     
     // Construct the file URL using the R2 public URL format
-    const publicFileUrl = `${this.r2Endpoint}/${this.r2BucketName}/${fileId}`;
+    const publicFileUrl = `${this.r2Endpoint}/${this.r2BucketName}/${encodeURIComponent(fileId)}`;
     
     return {
       id: result.result?.id || fileId,
