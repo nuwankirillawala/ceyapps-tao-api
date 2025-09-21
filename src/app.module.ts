@@ -18,6 +18,7 @@ import { SubscriptionPlansModule } from './subscription-plans/subscription-plans
 import { ReportingModule } from './reporting/reporting.module';
 import { RegionModule } from './region/region.module';
 import { CourseReviewsModule } from './course-reviews/course-reviews.module';
+import { CommentsModule } from './comments/comments.module';
 
 import { PrismaInterceptor } from './prisma/prisma.interceptor';
 
@@ -41,6 +42,7 @@ import { PrismaInterceptor } from './prisma/prisma.interceptor';
     ReportingModule,
     RegionModule,
     CourseReviewsModule,
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [

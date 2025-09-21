@@ -37,6 +37,8 @@ model User {
   userSubscriptions UserSubscription[] @relation("UserSubscriptions")
   wishlist          Wishlist[]         @relation("UserWishlist")
   reviews           CourseReview[]     @relation("UserReviews")
+  comments          Comment[]          @relation("UserComments")
+  replies           Reply[]            @relation("UserReplies")
 }
 
 model Course {
@@ -133,6 +135,7 @@ model Lesson {
   videoUrl       String?
   course         Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
   materials      Material[]
+  comments       Comment[]  @relation("LessonComments")
 }
 
 model Material {
@@ -414,6 +417,39 @@ model SubscriptionPayment {
   updatedAt             DateTime         @updatedAt
   status                String
   subscription          UserSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  lessonId  String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
+  lesson    Lesson   @relation("LessonComments", fields: [lessonId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserComments", fields: [userId], references: [id], onDelete: Cascade)
+  replies   Reply[]  @relation("CommentReplies")
+
+  @@index([lessonId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Reply {
+  id        String   @id @default(uuid())
+  content   String
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isActive  Boolean  @default(true)
+  comment   Comment  @relation("CommentReplies", fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserReplies", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 enum Role {
