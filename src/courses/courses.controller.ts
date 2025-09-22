@@ -250,6 +250,8 @@ export class CoursesController {
       }
     }
   })
+  @ApiResponse({ status: 404, description: 'Course not found' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
   async deleteCourse(@Param('id') id: string) {
     return this.coursesService.deleteCourse(id);
   }
