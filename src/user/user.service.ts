@@ -361,4 +361,17 @@ export class UserService {
       data: regionData,
     });
   }
+
+  // 🗑️ Delete a user (Admin only)
+  async deleteUser(userId: string): Promise<void> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Delete the user - this will cascade delete related records due to onDelete: Cascade
+    await this.prisma.user.delete({
+      where: { id: userId },
+    });
+  }
 }

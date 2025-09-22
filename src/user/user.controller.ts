@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Body, Req, Param, UseGuards, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Req, Param, UseGuards, UseInterceptors, UploadedFile, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles } from 'src/auth/roles.decorator';
@@ -250,5 +250,27 @@ export class UserController {
     @Body() adminUpdateUserDto: AdminUpdateUserDto
   ) { 
     return this.userService.updateUserByAdmin(userId, adminUpdateUserDto);
+  }
+
+  @Delete('admin/:userId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a user (Admin only)' })
+  @ApiResponse({ 
+    status: 204, 
+    description: 'User deleted successfully' 
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: 'User not found' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Forbidden - Admin access required' 
+  })
+  async deleteUserByAdmin(@Param('userId') userId: string) {
+    await this.userService.deleteUser(userId);
   }
 }
