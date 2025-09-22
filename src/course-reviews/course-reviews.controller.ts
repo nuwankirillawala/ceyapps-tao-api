@@ -99,10 +99,12 @@ export class CourseReviewsController {
   @ApiResponse({ status: 404, description: 'Course not found' })
   async getCourseReviews(
     @Param('courseId') courseId: string,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
   ) {
-    return this.courseReviewsService.getCourseReviews(courseId, page, limit);
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 10;
+    return this.courseReviewsService.getCourseReviews(courseId, pageNum, limitNum);
   }
 
   @Get('course/:courseId/stats')
@@ -227,10 +229,12 @@ export class CourseReviewsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin access required' })
   async getAllReviews(
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 50,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '50',
   ) {
-    return this.courseReviewsService.getAllReviews(page, limit);
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 50;
+    return this.courseReviewsService.getAllReviews(pageNum, limitNum);
   }
 
   @Get('admin/stats')

@@ -408,9 +408,81 @@ export class CoursesService {
     });
   }
 
-  async deleteCourse(id: string): Promise<void> {
-    await this.prisma.course.delete({
+  async deleteCourse(id: string): Promise<{ message: string }> {
+    // First check if course exists
+    const course = await this.prisma.course.findUnique({
       where: { id },
+      include: {
+        coursePricings: true,
+        orderItems: true,
+        PricingHistory: true,
+        trendingCourses: true,
+        wishlist: true,
+        cartItems: true,
+        enrollments: true,
+      },
+    });
+
+    if (!course) {
+      throw new NotFoundException(`Course with ID ${id} not found`);
+    }
+
+    console.log(`Deleting course: ${course.title} (ID: ${id})`);
+    console.log(`Related data found:`, {
+      coursePricings: course.coursePricings.length, // Manual cleanup needed
+      orderItems: course.orderItems.length, // Manual cleanup needed
+      pricingHistory: course.PricingHistory.length, // Cascade delete
+      trendingCourses: course.trendingCourses ? 1 : 0, // Cascade delete
+      wishlist: course.wishlist.length, // Cascade delete
+      cartItems: course.cartItems.length, // Cascade delete
+      enrollments: course.enrollments.length, // Cascade delete
+    });
+
+    // Use transaction to ensure data consistency
+    return this.prisma.$transaction(async (prisma) => {
+      // Only delete related data that doesn't have cascade deletes
+      
+      // 1. Delete course pricing relationships and orphaned pricing records
+      const coursePricingIds = course.coursePricings.map(cp => cp.id);
+      const pricingIds = course.coursePricings.map(cp => cp.pricingId);
+      
+      if (coursePricingIds.length > 0) {
+        await prisma.coursePricing.deleteMany({
+          where: { id: { in: coursePricingIds } },
+        });
+      }
+
+      // Clean up orphaned pricing records
+      if (pricingIds.length > 0) {
+        for (const pricingId of pricingIds) {
+          const otherCoursePricings = await prisma.coursePricing.findMany({
+            where: { pricingId },
+          });
+          
+          // If no other courses use this pricing, delete it
+          if (otherCoursePricings.length === 0) {
+            await prisma.pricing.delete({
+              where: { id: pricingId },
+            });
+          }
+        }
+      }
+
+      // 2. Delete order items (no cascade delete)
+      if (course.orderItems.length > 0) {
+        await prisma.orderItem.deleteMany({
+          where: { courseId: id },
+        });
+      }
+
+      // 3. Delete the course (this will automatically cascade delete):
+      // - lessons, materials, announcements, trendingCourses, wishlist, 
+      //   cartItems, enrollments, pricingHistory
+      await prisma.course.delete({
+        where: { id },
+      });
+
+      return { message: 'Course deleted successfully' };
     });
   }
 
