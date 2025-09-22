@@ -7,7 +7,6 @@ datasource db {
   provider     = "postgresql"
   url          = env("DATABASE_URL")
   relationMode = "prisma"
-  extensions   = [uuid_ossp(map: "uuid-ossp", schema: "extensions")]
 }
 
 model User {
@@ -39,6 +38,7 @@ model User {
   reviews           CourseReview[]     @relation("UserReviews")
   comments          Comment[]          @relation("UserComments")
   replies           Reply[]            @relation("UserReplies")
+  payments          Payment[]          @relation("UserPayments")
 }
 
 model Course {
@@ -69,6 +69,7 @@ model Course {
   enrollments        UserEnrollment[] @relation("CourseEnrollments")
   wishlist           Wishlist[]       @relation("CourseWishlist")
   reviews            CourseReview[]   @relation("CourseReviews")
+  payments           Payment[]        @relation("CoursePayments")
 }
 
 model CourseReview {
@@ -396,6 +397,7 @@ model UserSubscription {
   subscriptionPlanId   String
   status               SubscriptionStatus    @default(ACTIVE)
   subscriptionPayments SubscriptionPayment[]
+  payments             Payment[]             @relation("SubscriptionPayments")
   subscriptionPlan     SubscriptionPlan      @relation(fields: [subscriptionPlanId], references: [id], onDelete: Cascade)
   user                 User                  @relation("UserSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
 
@@ -417,6 +419,32 @@ model SubscriptionPayment {
   updatedAt             DateTime         @updatedAt
   status                String
   subscription          UserSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id                    String           @id @default(uuid())
+  userId                String
+  courseId              String?
+  subscriptionId        String?
+  amount                Float
+  currency              String           @default("USD")
+  paymentType           PaymentType
+  stripePaymentIntentId String?          @unique
+  stripeSessionId       String?          @unique
+  stripeChargeId        String?          @unique
+  status                PaymentStatus    @default(PENDING)
+  paidAt                DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  user                  User             @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
+  course                Course?          @relation("CoursePayments", fields: [courseId], references: [id], onDelete: SetNull)
+  subscription          UserSubscription? @relation("SubscriptionPayments", fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([paidAt])
 }
 
 model Comment {
@@ -516,4 +544,19 @@ enum SubscriptionStatus {
   INCOMPLETE
   INCOMPLETE_EXPIRED
   PAUSED
+}
+
+enum PaymentType {
+  COURSE_PURCHASE
+  SUBSCRIPTION_PAYMENT
+  CART_CHECKOUT
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
+  PARTIALLY_REFUNDED
 }

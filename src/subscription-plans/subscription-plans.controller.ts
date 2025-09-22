@@ -27,6 +27,8 @@ import { Roles } from '../auth/roles.decorator';
 import Stripe from 'stripe';
 import { Public } from '../auth/public.decorator';
 import { CoursesService } from 'src/courses/courses.service';
+import { PaymentsService } from '../payments/payments.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('subscription-plans')
 @Controller('subscription-plans')
@@ -38,7 +40,9 @@ export class SubscriptionPlansController {
   constructor(
     private readonly subscriptionPlansService: SubscriptionPlansService,
     private readonly stripeCheckoutService: StripeCheckoutService,
-    private readonly coursesService: CoursesService
+    private readonly coursesService: CoursesService,
+    private readonly paymentsService: PaymentsService,
+    private readonly prisma: PrismaService
   ) {}
 
   @Post()
@@ -588,6 +592,24 @@ export class SubscriptionPlansController {
         cancelUrl: body.cancelUrl,
         customerEmail: userEmail,
       });
+
+      // Create payment record upfront for tracking
+      const user = await this.prisma.user.findUnique({
+        where: { email: userEmail }
+      });
+
+      if (user) {
+        await this.paymentsService.createPayment({
+          userId: user.id,
+          courseId: course.id,
+          amount: course.coursePricings[0].pricing.price,
+          currency: course.coursePricings[0].pricing.currency,
+          paymentType: 'COURSE_PURCHASE' as any,
+          stripeSessionId: checkoutSession.sessionId,
+          status: 'PENDING' as any,
+        });
+      }
+
       return checkoutSession;
     } catch (error) {
       throw new HttpException(
@@ -597,6 +619,184 @@ export class SubscriptionPlansController {
     }
   }
 
+  @Post('/cart/checkout')
+  @ApiOperation({ summary: 'Create Stripe checkout session for cart' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        courseIds: { 
+          type: 'array', 
+          items: { type: 'string' },
+          description: 'Array of course IDs to checkout' 
+        },
+        successUrl: { type: 'string', description: 'URL to redirect after successful payment' },
+        cancelUrl: { type: 'string', description: 'URL to redirect if payment is cancelled' }
+      },
+      required: ['courseIds', 'successUrl', 'cancelUrl']
+    }
+  })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'Cart checkout session created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        sessionId: { type: 'string' },
+        url: { type: 'string' }
+      }
+    }
+  })
+  async createCartCheckoutSession(
+    @Body() body: {
+      courseIds: string[];
+      successUrl: string;
+      cancelUrl: string;
+    },
+    @Req() req: any
+  ) {
+    try {
+      const userEmail = req.user?.email;
+      if (!userEmail) {
+        throw new HttpException('User email not found in token', HttpStatus.UNAUTHORIZED);
+      }
+
+      // Get course details for all courses
+      const courses = await Promise.all(
+        body.courseIds.map(courseId => this.coursesService.getCourseById(courseId))
+      );
+
+      // Check if all courses exist
+      const missingCourses = courses.filter(course => !course);
+      if (missingCourses.length > 0) {
+        throw new HttpException('One or more courses not found', HttpStatus.NOT_FOUND);
+      }
+
+      // Extract course data
+      const courseNames = courses.map(course => course.title);
+      const coursePrices = courses.map(course => course.coursePricings[0]?.pricing?.price || 0);
+      const currency = courses[0]?.coursePricings[0]?.pricing?.currency || 'USD';
+
+      const checkoutSession = await this.stripeCheckoutService.createCartCheckoutSession({
+        courseIds: body.courseIds,
+        courseNames,
+        coursePrices,
+        currency,
+        successUrl: body.successUrl,
+        cancelUrl: body.cancelUrl,
+        customerEmail: userEmail,
+      });
+
+      // Create payment record upfront for tracking
+      const user = await this.prisma.user.findUnique({
+        where: { email: userEmail }
+      });
+
+      if (user) {
+        const totalAmount = coursePrices.reduce((sum, price) => sum + price, 0);
+        await this.paymentsService.createPayment({
+          userId: user.id,
+          amount: totalAmount,
+          currency: currency,
+          paymentType: 'CART_CHECKOUT' as any,
+          stripeSessionId: checkoutSession.sessionId,
+          status: 'PENDING' as any,
+        });
+      }
+
+      return checkoutSession;
+    } catch (error) {
+      throw new HttpException(
+        `Failed to create cart checkout session: ${error.message}`,
+        HttpStatus.BAD_REQUEST
+      );
+    }
+  }
+
+  @Get('user-subscription-status')
+  @ApiOperation({ summary: 'Get user subscription status and plan details' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'User subscription status retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        hasActiveSubscription: { type: 'boolean' },
+        currentPlan: { type: 'object' },
+        planFeatures: { type: 'array', items: { type: 'string' } },
+        maxCourses: { type: 'number' },
+        subscriptionEndDate: { type: 'string' },
+        message: { type: 'string' }
+      }
+    }
+  })
+  async getUserSubscriptionStatus(@Req() req: any) {
+    try {
+      const userEmail = req.user?.email;
+      if (!userEmail) {
+        throw new HttpException('User email not found in token', HttpStatus.UNAUTHORIZED);
+      }
+
+      const subscriptionStatus = await this.subscriptionPlansService.getUserSubscriptionStatus(userEmail);
+      return subscriptionStatus;
+    } catch (error) {
+      throw new HttpException(
+        `Failed to get user subscription status: ${error.message}`,
+        HttpStatus.BAD_REQUEST
+      );
+    }
+  }
+
+  @Post('check-feature-access')
+  @ApiOperation({ summary: 'Check user feature access based on subscription' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        feature: { type: 'string', description: 'Feature to check access for' },
+        courseId: { type: 'string', description: 'Optional course ID for course-specific access checks' }
+      },
+      required: ['feature']
+    }
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Feature access status retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        canAccess: { type: 'boolean' },
+        reason: { type: 'string' },
+        currentPlan: { type: 'string' },
+        upgradeRequired: { type: 'boolean' },
+        message: { type: 'string' }
+      }
+    }
+  })
+  async checkFeatureAccess(
+    @Body() body: { feature: string; courseId?: string },
+    @Req() req: any
+  ) {
+    try {
+      const userEmail = req.user?.email;
+      if (!userEmail) {
+        throw new HttpException('User email not found in token', HttpStatus.UNAUTHORIZED);
+      }
+
+      const accessResult = await this.subscriptionPlansService.checkFeatureAccess(
+        userEmail, 
+        body.feature, 
+        body.courseId
+      );
+      
+      return accessResult;
+    } catch (error) {
+      throw new HttpException(
+        `Failed to check feature access: ${error.message}`,
+        HttpStatus.BAD_REQUEST
+      );
+    }
+  }
 
   @Post('payment/:planId')
   @ApiOperation({ summary: 'Handle subscription payment (from opushub-api)' })

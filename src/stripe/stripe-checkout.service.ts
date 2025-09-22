@@ -191,6 +191,66 @@ export class StripeCheckoutService {
   }
 
   /**
+   * Create a Stripe checkout session for cart checkout
+   */
+  async createCartCheckoutSession(data: {
+    courseIds: string[];
+    courseNames: string[];
+    coursePrices: number[];
+    currency: string;
+    successUrl: string;
+    cancelUrl: string;
+    customerEmail?: string;
+    metadata?: Record<string, string>;
+  }) {
+    try {
+      this.logger.log(`Creating cart checkout session for ${data.courseIds.length} courses`);
+
+      // Create line items for each course
+      const lineItems = data.courseIds.map((courseId, index) => ({
+        price_data: {
+          currency: data.currency.toLowerCase(),
+          product_data: {
+            name: data.courseNames[index],
+            description: `Course: ${data.courseNames[index]}`,
+          },
+          unit_amount: Math.round(data.coursePrices[index] * 100), // Convert to cents
+        },
+        quantity: 1,
+      }));
+
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: lineItems,
+        success_url: data.successUrl,
+        cancel_url: data.cancelUrl,
+        allow_promotion_codes: true, // Allow users to enter promotion codes
+        billing_address_collection: 'required', // Collect billing address
+        customer_email: data.customerEmail, // Pre-fill customer email
+        metadata: {
+          courseIds: data.courseIds.join(','),
+          courseNames: data.courseNames.join(','),
+          customerEmail: data.customerEmail,
+          paymentType: 'cart_payment',
+          ...data.metadata,
+        },
+      };
+
+      const session = await this.stripe.checkout.sessions.create(sessionParams);
+
+      this.logger.log(`Cart checkout session created: ${session.id}`);
+      return {
+        sessionId: session.id,
+        url: session.url,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to create cart checkout session: ${error.message}`);
+      throw new Error(`Failed to create cart checkout session: ${error.message}`);
+    }
+  }
+
+  /**
    * Retrieve a checkout session
    */
   async getCheckoutSession(sessionId: string) {

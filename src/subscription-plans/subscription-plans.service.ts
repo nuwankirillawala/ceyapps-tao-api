@@ -9,6 +9,23 @@ import {
 } from './subscription-plans.model';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { PaymentsService } from '../payments/payments.service';
+
+// Temporary enums until Prisma client is regenerated
+enum PaymentType {
+  COURSE_PURCHASE = 'COURSE_PURCHASE',
+  SUBSCRIPTION_PAYMENT = 'SUBSCRIPTION_PAYMENT',
+  CART_CHECKOUT = 'CART_CHECKOUT'
+}
+
+enum PaymentStatus {
+  PENDING = 'PENDING',
+  SUCCEEDED = 'SUCCEEDED',
+  FAILED = 'FAILED',
+  CANCELED = 'CANCELED',
+  REFUNDED = 'REFUNDED',
+  PARTIALLY_REFUNDED = 'PARTIALLY_REFUNDED'
+}
 
 @Injectable()
 export class SubscriptionPlansService implements OnModuleInit {
@@ -18,7 +35,8 @@ export class SubscriptionPlansService implements OnModuleInit {
   constructor(
     private configService: ConfigService, 
     private prisma: PrismaService,
-    private subscriptionService: SubscriptionService
+    private subscriptionService: SubscriptionService,
+    private paymentsService: PaymentsService
   ) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) {
@@ -709,6 +727,10 @@ export class SubscriptionPlansService implements OnModuleInit {
         case "payment_intent.succeeded": {
           this.logger.log('Processing payment_intent.succeeded event');
           const paymentIntent = event.data.object as Stripe.PaymentIntent;
+          
+          // Handle payment tracking
+          await this.handlePaymentIntentSucceeded(paymentIntent);
+          
           // Fetch the invoice (if available)
           if (paymentIntent.latest_charge) {
             const charge = await this.stripe.charges.retrieve(paymentIntent.latest_charge as string);
@@ -802,6 +824,36 @@ export class SubscriptionPlansService implements OnModuleInit {
   }
 
   /**
+   * Handle payment intent succeeded event
+   */
+  private async handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+    try {
+      this.logger.log(`Processing payment intent succeeded: ${paymentIntent.id}`);
+      
+      // Try to find existing payment record
+      const existingPayment = await this.paymentsService.findByStripePaymentIntentId(paymentIntent.id);
+      
+      if (existingPayment) {
+        // Update existing payment status
+        await this.paymentsService.updatePaymentStatus(
+          existingPayment.id,
+          PaymentStatus.SUCCEEDED,
+          {
+            paidAt: new Date(),
+          }
+        );
+        this.logger.log(`Updated existing payment ${existingPayment.id} to succeeded`);
+      } else {
+        // This might be a payment that wasn't tracked initially
+        // We can create a new payment record if we have enough information
+        this.logger.warn(`No existing payment found for payment intent: ${paymentIntent.id}`);
+      }
+    } catch (error) {
+      this.logger.error(`Error handling payment intent succeeded: ${error.message}`);
+    }
+  }
+
+  /**
    * Handle checkout session completed event
    */
   private async handleCheckoutSessionCompleted(event: Stripe.Event) {
@@ -831,10 +883,94 @@ export class SubscriptionPlansService implements OnModuleInit {
           return;
         }
 
+        // Create payment record for subscription
+        await this.paymentsService.createPayment({
+          userId: user.id,
+          subscriptionId: subscription.id,
+          amount: subscription.items.data[0]?.price.unit_amount ? subscription.items.data[0].price.unit_amount / 100 : 0,
+          currency: subscription.currency.toUpperCase(),
+          paymentType: PaymentType.SUBSCRIPTION_PAYMENT,
+          stripeSessionId: session.id,
+          stripePaymentIntentId: session.payment_intent as string,
+          status: PaymentStatus.SUCCEEDED,
+        });
+
         // Create user subscription using the existing subscription service
         // The subscription service will handle the webhook events and create the user subscription
         this.logger.log(`Checkout session completed for user: ${user.id}, plan: ${planId}`);
         this.logger.log(`Subscription will be created via webhook: ${subscription.id}`);
+      } else if (session.mode === 'payment') {
+        // Handle one-time payment (course purchase or cart checkout)
+        const customerEmail = session.customer_email;
+        const paymentIntent = session.payment_intent as string;
+        
+        if (!customerEmail) {
+          this.logger.error('Missing customerEmail in checkout session');
+          return;
+        }
+
+        // Find user by email
+        const user = await this.prisma.user.findUnique({
+          where: { email: customerEmail }
+        });
+
+        if (!user) {
+          this.logger.error(`User not found for email: ${customerEmail}`);
+          return;
+        }
+
+        // Determine payment type and course IDs from metadata
+        const paymentType = session.metadata?.paymentType || 'course_payment';
+        const courseIds = session.metadata?.courseIds ? session.metadata.courseIds.split(',') : [];
+        
+        // Get payment intent details
+        const paymentIntentDetails = await this.stripe.paymentIntents.retrieve(paymentIntent);
+        
+        // Find and update existing payment record
+        const existingPayment = await this.paymentsService.findByStripeSessionId(session.id);
+        
+        if (existingPayment) {
+          // Update existing payment with Stripe details
+          await this.paymentsService.updatePaymentStatus(
+            existingPayment.id,
+            PaymentStatus.SUCCEEDED,
+            {
+              stripePaymentIntentId: paymentIntent,
+              paidAt: new Date(),
+            }
+          );
+          this.logger.log(`Updated existing payment ${existingPayment.id} to succeeded`);
+        } else {
+          // Fallback: create new payment record if not found
+          this.logger.warn(`No existing payment found for session ${session.id}, creating new one`);
+          
+          if (courseIds.length > 1 || paymentType === 'cart_payment') {
+            // Cart checkout - create single payment record
+            await this.paymentsService.createPayment({
+              userId: user.id,
+              amount: paymentIntentDetails.amount / 100,
+              currency: paymentIntentDetails.currency.toUpperCase(),
+              paymentType: PaymentType.CART_CHECKOUT,
+              stripeSessionId: session.id,
+              stripePaymentIntentId: paymentIntent,
+              status: PaymentStatus.SUCCEEDED,
+            });
+          } else if (courseIds.length === 1) {
+            // Single course purchase
+            await this.paymentsService.createPayment({
+              userId: user.id,
+              courseId: courseIds[0],
+              amount: paymentIntentDetails.amount / 100,
+              currency: paymentIntentDetails.currency.toUpperCase(),
+              paymentType: PaymentType.COURSE_PURCHASE,
+              stripeSessionId: session.id,
+              stripePaymentIntentId: paymentIntent,
+              status: PaymentStatus.SUCCEEDED,
+            });
+          }
+        }
+
+        this.logger.log(`Checkout session completed for user: ${user.id}, payment type: ${paymentType}`);
       }
     } catch (error) {
       this.logger.error(`Error handling checkout session completed: ${error.message}`);
